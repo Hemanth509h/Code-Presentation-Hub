@@ -47,7 +47,7 @@ export function Layout({ children }) {
               </div>
             )}
 
-            {user && (
+            {user && !candidateId && (
               <Button
                 variant="outline"
                 size="sm"

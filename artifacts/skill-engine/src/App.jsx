@@ -26,9 +26,9 @@ function AuthGuard({ children }) {
 }
 
 function AppRouter() {
-  const { isRecruiterMode, user } = useAppStore();
+  const { isRecruiterMode, candidateId, user } = useAppStore();
 
-  if (user && isRecruiterMode) {
+  if (user && isRecruiterMode && !candidateId) {
     return (
       <Layout>
         <Switch>
