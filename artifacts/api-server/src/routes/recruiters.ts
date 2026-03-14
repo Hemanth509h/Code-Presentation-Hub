@@ -1,51 +1,38 @@
 import { Router, type IRouter } from "express";
-import { db } from "@workspace/db";
-import { candidatesTable, submissionsTable, assessmentsTable } from "@workspace/db/schema";
-import { eq, desc, count } from "drizzle-orm";
+import { supabase } from "../lib/supabase";
 
 const router: IRouter = Router();
 
 router.get("/rankings", async (req, res) => {
   const assessmentType = req.query.assessmentType as string | undefined;
 
-  const candidates = await db
-    .select()
-    .from(candidatesTable)
-    .where(eq(candidatesTable.overallScore, candidatesTable.overallScore))
-    .orderBy(desc(candidatesTable.overallScore));
+  const { data: candidates } = await supabase
+    .from("candidates")
+    .select("*")
+    .not("overall_score", "is", null)
+    .order("overall_score", { ascending: false });
 
   const ranked = await Promise.all(
-    candidates.map(async (c, idx) => {
-      const submissions = await db
-        .select()
-        .from(submissionsTable)
-        .where(eq(submissionsTable.candidateId, c.candidateId));
+    (candidates ?? []).map(async (c: any, idx: number) => {
+      const { data: submissions } = await supabase
+        .from("submissions")
+        .select("*, assessments(type)")
+        .eq("candidate_id", c.candidate_id);
 
-      const scores: Record<string, number | null> = {
-        coding: null,
-        aptitude: null,
-        technical: null,
-      };
-
-      for (const sub of submissions) {
-        const [assessment] = await db
-          .select()
-          .from(assessmentsTable)
-          .where(eq(assessmentsTable.assessmentId, sub.assessmentId))
-          .limit(1);
-        if (assessment) {
-          scores[assessment.type] = sub.percentage;
-        }
+      const scores: Record<string, number | null> = { coding: null, aptitude: null, technical: null };
+      for (const sub of submissions ?? []) {
+        const type = (sub as any).assessments?.type;
+        if (type) scores[type] = sub.percentage;
       }
 
       return {
         rank: idx + 1,
-        candidateId: c.candidateId,
-        targetRole: c.targetRole,
+        candidateId: c.candidate_id,
+        targetRole: c.target_role,
         skills: c.skills,
-        experienceYears: c.experienceYears,
-        overallScore: c.overallScore ?? 0,
-        assessmentsCompleted: submissions.length,
+        experienceYears: c.experience_years,
+        overallScore: c.overall_score ?? 0,
+        assessmentsCompleted: submissions?.length ?? 0,
         codingScore: scores.coding,
         aptitudeScore: scores.aptitude,
         technicalScore: scores.technical,
@@ -67,22 +54,24 @@ router.get("/rankings", async (req, res) => {
 });
 
 router.get("/stats", async (_req, res) => {
-  const allCandidates = await db.select().from(candidatesTable);
-  const allSubmissions = await db.select().from(submissionsTable);
+  const { data: allCandidates } = await supabase.from("candidates").select("*");
+  const { count: assessmentsCompleted } = await supabase
+    .from("submissions")
+    .select("*", { count: "exact", head: true });
 
-  const totalCandidates = allCandidates.length;
-  const assessmentsCompleted = allSubmissions.length;
+  const candidates = allCandidates ?? [];
+  const totalCandidates = candidates.length;
 
-  const avgScore =
-    allCandidates.length > 0
-      ? allCandidates.reduce((sum, c) => sum + (c.overallScore ?? 0), 0) / allCandidates.filter((c) => c.overallScore !== null).length || 0
-      : 0;
+  const scored = candidates.filter((c: any) => c.overall_score !== null);
+  const avgScore = scored.length > 0
+    ? scored.reduce((sum: number, c: any) => sum + c.overall_score, 0) / scored.length
+    : 0;
 
-  const topPerformers = allCandidates.filter((c) => (c.overallScore ?? 0) >= 80).length;
+  const topPerformers = candidates.filter((c: any) => (c.overall_score ?? 0) >= 80).length;
 
   const roleMap = new Map<string, number>();
-  for (const c of allCandidates) {
-    roleMap.set(c.targetRole, (roleMap.get(c.targetRole) ?? 0) + 1);
+  for (const c of candidates) {
+    roleMap.set((c as any).target_role, (roleMap.get((c as any).target_role) ?? 0) + 1);
   }
   const roleDistribution = Array.from(roleMap.entries()).map(([role, count]) => ({ role, count }));
 
@@ -96,15 +85,15 @@ router.get("/stats", async (_req, res) => {
 
   const scoreDistribution = ranges.map(({ range, min, max }) => ({
     range,
-    count: allCandidates.filter((c) => {
-      const s = c.overallScore ?? 0;
+    count: candidates.filter((c: any) => {
+      const s = c.overall_score ?? 0;
       return s >= min && s <= max;
     }).length,
   }));
 
   res.json({
     totalCandidates,
-    assessmentsCompleted,
+    assessmentsCompleted: assessmentsCompleted ?? 0,
     averageScore: Math.round(avgScore * 10) / 10,
     topPerformers,
     roleDistribution,

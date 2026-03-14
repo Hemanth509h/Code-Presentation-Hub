@@ -1,7 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db } from "@workspace/db";
-import { candidatesTable, submissionsTable, assessmentsTable } from "@workspace/db/schema";
-import { eq, avg, count } from "drizzle-orm";
+import { supabase } from "../lib/supabase";
 import { RegisterCandidateBody } from "@workspace/api-zod";
 
 const router: IRouter = Router();
@@ -14,42 +12,46 @@ function generateCandidateId(): string {
 router.post("/register", async (req, res) => {
   try {
     const body = RegisterCandidateBody.parse(req.body);
+
     let candidateId = generateCandidateId();
     let attempts = 0;
     while (attempts < 10) {
-      const existing = await db
-        .select()
-        .from(candidatesTable)
-        .where(eq(candidatesTable.candidateId, candidateId))
-        .limit(1);
-      if (existing.length === 0) break;
+      const { data } = await supabase
+        .from("candidates")
+        .select("candidate_id")
+        .eq("candidate_id", candidateId)
+        .maybeSingle();
+      if (!data) break;
       candidateId = generateCandidateId();
       attempts++;
     }
 
-    const [candidate] = await db
-      .insert(candidatesTable)
-      .values({
-        candidateId,
-        targetRole: body.targetRole,
+    const { data: candidate, error } = await supabase
+      .from("candidates")
+      .insert({
+        candidate_id: candidateId,
+        target_role: body.targetRole,
         skills: body.skills,
-        experienceYears: body.experienceYears,
+        experience_years: body.experienceYears,
       })
-      .returning();
+      .select()
+      .single();
 
-    const completedCount = await db
-      .select({ count: count() })
-      .from(submissionsTable)
-      .where(eq(submissionsTable.candidateId, candidateId));
+    if (error) throw error;
+
+    const { count } = await supabase
+      .from("submissions")
+      .select("*", { count: "exact", head: true })
+      .eq("candidate_id", candidateId);
 
     res.status(201).json({
-      candidateId: candidate.candidateId,
-      targetRole: candidate.targetRole,
+      candidateId: candidate.candidate_id,
+      targetRole: candidate.target_role,
       skills: candidate.skills,
-      experienceYears: candidate.experienceYears,
-      registeredAt: candidate.registeredAt.toISOString(),
-      completedAssessments: completedCount[0]?.count ?? 0,
-      overallScore: candidate.overallScore ?? null,
+      experienceYears: candidate.experience_years,
+      registeredAt: candidate.registered_at,
+      completedAssessments: count ?? 0,
+      overallScore: candidate.overall_score ?? null,
     });
   } catch (err: any) {
     res.status(400).json({ error: "validation_error", message: err.message ?? "Invalid input" });
@@ -58,56 +60,61 @@ router.post("/register", async (req, res) => {
 
 router.get("/:candidateId", async (req, res) => {
   const { candidateId } = req.params;
-  const [candidate] = await db
-    .select()
-    .from(candidatesTable)
-    .where(eq(candidatesTable.candidateId, candidateId))
-    .limit(1);
 
-  if (!candidate) {
+  const { data: candidate, error } = await supabase
+    .from("candidates")
+    .select("*")
+    .eq("candidate_id", candidateId)
+    .maybeSingle();
+
+  if (error || !candidate) {
     return res.status(404).json({ error: "not_found", message: "Candidate not found" });
   }
 
-  const submissions = await db
-    .select({ count: count() })
-    .from(submissionsTable)
-    .where(eq(submissionsTable.candidateId, candidateId));
+  const { count } = await supabase
+    .from("submissions")
+    .select("*", { count: "exact", head: true })
+    .eq("candidate_id", candidateId);
 
   res.json({
-    candidateId: candidate.candidateId,
-    targetRole: candidate.targetRole,
+    candidateId: candidate.candidate_id,
+    targetRole: candidate.target_role,
     skills: candidate.skills,
-    experienceYears: candidate.experienceYears,
-    registeredAt: candidate.registeredAt.toISOString(),
-    completedAssessments: submissions[0]?.count ?? 0,
-    overallScore: candidate.overallScore ?? null,
+    experienceYears: candidate.experience_years,
+    registeredAt: candidate.registered_at,
+    completedAssessments: count ?? 0,
+    overallScore: candidate.overall_score ?? null,
   });
 });
 
 router.get("/:candidateId/results", async (req, res) => {
   const { candidateId } = req.params;
 
-  const submissions = await db
-    .select()
-    .from(submissionsTable)
-    .where(eq(submissionsTable.candidateId, candidateId));
+  const { data: submissions } = await supabase
+    .from("submissions")
+    .select("*")
+    .eq("candidate_id", candidateId);
+
+  if (!submissions) {
+    return res.json({ candidateId, assessments: [], overallScore: null, rank: null });
+  }
 
   const results = await Promise.all(
-    submissions.map(async (sub) => {
-      const [assessment] = await db
-        .select()
-        .from(assessmentsTable)
-        .where(eq(assessmentsTable.assessmentId, sub.assessmentId))
-        .limit(1);
+    submissions.map(async (sub: any) => {
+      const { data: assessment } = await supabase
+        .from("assessments")
+        .select("*")
+        .eq("assessment_id", sub.assessment_id)
+        .maybeSingle();
 
       return {
-        assessmentId: sub.assessmentId,
+        assessmentId: sub.assessment_id,
         assessmentTitle: assessment?.title ?? "Unknown",
         assessmentType: assessment?.type ?? "technical",
         score: sub.score,
-        maxScore: sub.maxScore,
+        maxScore: sub.max_score,
         percentage: sub.percentage,
-        completedAt: sub.completedAt.toISOString(),
+        completedAt: sub.completed_at,
       };
     })
   );
