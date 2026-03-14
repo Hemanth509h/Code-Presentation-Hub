@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useAppStore } from "@/store/use-app-store";
 import { useRegisterCandidate } from "@workspace/api-client-react";
@@ -17,10 +17,11 @@ export default function Home() {
   const [experience, setExperience] = useState("");
   const [registeredProfile, setRegisteredProfile] = useState<{ id: string } | null>(null);
 
-  if (candidateId) {
-    setLocation("/dashboard");
-    return null;
-  }
+  useEffect(() => {
+    if (candidateId) {
+      setLocation("/dashboard");
+    }
+  }, [candidateId, setLocation]);
 
   const handleAddSkill = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && skillInput.trim()) {
