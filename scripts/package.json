@@ -4,16 +4,12 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "hello": "tsx ./src/hello.ts",
-    "seed-assessments": "tsx ./src/seed-assessments.ts",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "hello": "node ./src/hello.js",
+    "seed-assessments": "node ./src/seed-assessments.js"
   },
   "dependencies": {
     "@workspace/db": "workspace:*",
     "drizzle-orm": "catalog:"
   },
-  "devDependencies": {
-    "@types/node": "catalog:",
-    "tsx": "catalog:"
-  }
+  "devDependencies": {}
 }
