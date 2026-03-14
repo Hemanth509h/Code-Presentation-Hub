@@ -1,0 +1,441 @@
+openapi: 3.1.0
+info:
+  title: Api
+  version: 0.1.0
+  description: Gender-Neutral Skill Assessment Engine API
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: candidates
+    description: Candidate registration and assessment
+  - name: assessments
+    description: Test management and submission
+  - name: recruiters
+    description: Recruiter dashboard and rankings
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /candidates/register:
+    post:
+      operationId: registerCandidate
+      tags: [candidates]
+      summary: Register a candidate (anonymized)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CandidateRegisterInput"
+      responses:
+        "201":
+          description: Candidate registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CandidateProfile"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /candidates/{candidateId}:
+    get:
+      operationId: getCandidateProfile
+      tags: [candidates]
+      summary: Get candidate profile by ID
+      parameters:
+        - name: candidateId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Candidate profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CandidateProfile"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /candidates/{candidateId}/results:
+    get:
+      operationId: getCandidateResults
+      tags: [candidates]
+      summary: Get candidate test results
+      parameters:
+        - name: candidateId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Test results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CandidateResults"
+
+  /assessments:
+    get:
+      operationId: listAssessments
+      tags: [assessments]
+      summary: List all available assessments
+      responses:
+        "200":
+          description: List of assessments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Assessment"
+
+  /assessments/{assessmentId}:
+    get:
+      operationId: getAssessment
+      tags: [assessments]
+      summary: Get assessment with questions
+      parameters:
+        - name: assessmentId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Assessment with questions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssessmentWithQuestions"
+
+  /assessments/{assessmentId}/submit:
+    post:
+      operationId: submitAssessment
+      tags: [assessments]
+      summary: Submit answers for an assessment
+      parameters:
+        - name: assessmentId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AssessmentSubmission"
+      responses:
+        "200":
+          description: Submission result with score
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubmissionResult"
+
+  /recruiters/rankings:
+    get:
+      operationId: getCandidateRankings
+      tags: [recruiters]
+      summary: Get anonymized candidate rankings
+      parameters:
+        - name: assessmentType
+          in: query
+          schema:
+            type: string
+            enum: [coding, aptitude, technical, all]
+      responses:
+        "200":
+          description: Ranked candidates (anonymized)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RankedCandidate"
+
+  /recruiters/stats:
+    get:
+      operationId: getRecruitmentStats
+      tags: [recruiters]
+      summary: Get recruitment overview statistics
+      responses:
+        "200":
+          description: Recruitment stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RecruitmentStats"
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required: [status]
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+      required: [error, message]
+
+    CandidateRegisterInput:
+      type: object
+      properties:
+        skills:
+          type: array
+          items:
+            type: string
+        targetRole:
+          type: string
+        experienceYears:
+          type: integer
+          minimum: 0
+      required: [skills, targetRole, experienceYears]
+
+    CandidateProfile:
+      type: object
+      properties:
+        candidateId:
+          type: string
+        targetRole:
+          type: string
+        skills:
+          type: array
+          items:
+            type: string
+        experienceYears:
+          type: integer
+        registeredAt:
+          type: string
+          format: date-time
+        completedAssessments:
+          type: integer
+        overallScore:
+          type: number
+          nullable: true
+      required: [candidateId, targetRole, skills, experienceYears, registeredAt, completedAssessments]
+
+    CandidateResults:
+      type: object
+      properties:
+        candidateId:
+          type: string
+        assessments:
+          type: array
+          items:
+            $ref: "#/components/schemas/AssessmentResult"
+        overallScore:
+          type: number
+          nullable: true
+        rank:
+          type: integer
+          nullable: true
+      required: [candidateId, assessments]
+
+    AssessmentResult:
+      type: object
+      properties:
+        assessmentId:
+          type: string
+        assessmentTitle:
+          type: string
+        assessmentType:
+          type: string
+          enum: [coding, aptitude, technical]
+        score:
+          type: number
+        maxScore:
+          type: number
+        percentage:
+          type: number
+        completedAt:
+          type: string
+          format: date-time
+      required: [assessmentId, assessmentTitle, assessmentType, score, maxScore, percentage, completedAt]
+
+    Assessment:
+      type: object
+      properties:
+        assessmentId:
+          type: string
+        title:
+          type: string
+        type:
+          type: string
+          enum: [coding, aptitude, technical]
+        description:
+          type: string
+        durationMinutes:
+          type: integer
+        totalQuestions:
+          type: integer
+        maxScore:
+          type: number
+      required: [assessmentId, title, type, description, durationMinutes, totalQuestions, maxScore]
+
+    AssessmentWithQuestions:
+      allOf:
+        - $ref: "#/components/schemas/Assessment"
+        - type: object
+          properties:
+            questions:
+              type: array
+              items:
+                $ref: "#/components/schemas/Question"
+          required: [questions]
+
+    Question:
+      type: object
+      properties:
+        questionId:
+          type: string
+        text:
+          type: string
+        type:
+          type: string
+          enum: [multiple_choice, coding, short_answer]
+        options:
+          type: array
+          items:
+            type: string
+          nullable: true
+        points:
+          type: number
+      required: [questionId, text, type, points]
+
+    AssessmentSubmission:
+      type: object
+      properties:
+        candidateId:
+          type: string
+        answers:
+          type: array
+          items:
+            $ref: "#/components/schemas/Answer"
+      required: [candidateId, answers]
+
+    Answer:
+      type: object
+      properties:
+        questionId:
+          type: string
+        selectedOption:
+          type: integer
+          nullable: true
+        textAnswer:
+          type: string
+          nullable: true
+      required: [questionId]
+
+    SubmissionResult:
+      type: object
+      properties:
+        candidateId:
+          type: string
+        assessmentId:
+          type: string
+        score:
+          type: number
+        maxScore:
+          type: number
+        percentage:
+          type: number
+        passed:
+          type: boolean
+        feedback:
+          type: string
+      required: [candidateId, assessmentId, score, maxScore, percentage, passed, feedback]
+
+    RankedCandidate:
+      type: object
+      properties:
+        rank:
+          type: integer
+        candidateId:
+          type: string
+        targetRole:
+          type: string
+        skills:
+          type: array
+          items:
+            type: string
+        experienceYears:
+          type: integer
+        overallScore:
+          type: number
+        assessmentsCompleted:
+          type: integer
+        codingScore:
+          type: number
+          nullable: true
+        aptitudeScore:
+          type: number
+          nullable: true
+        technicalScore:
+          type: number
+          nullable: true
+      required: [rank, candidateId, targetRole, skills, experienceYears, overallScore, assessmentsCompleted]
+
+    RecruitmentStats:
+      type: object
+      properties:
+        totalCandidates:
+          type: integer
+        assessmentsCompleted:
+          type: integer
+        averageScore:
+          type: number
+        topPerformers:
+          type: integer
+        roleDistribution:
+          type: array
+          items:
+            type: object
+            properties:
+              role:
+                type: string
+              count:
+                type: integer
+            required: [role, count]
+        scoreDistribution:
+          type: array
+          items:
+            type: object
+            properties:
+              range:
+                type: string
+              count:
+                type: integer
+            required: [range, count]
+      required: [totalCandidates, assessmentsCompleted, averageScore, topPerformers, roleDistribution, scoreDistribution]
