@@ -15,9 +15,11 @@
     "esbuild": "^0.25.0"
   },
   "scripts": {
-    "dev": "PORT=8080 npm run dev --workspace=@workspace/api-server & PORT=21181 BASE_PATH=/ npm run dev --workspace=@workspace/skill-engine"
+    "dev": "concurrently \"cross-env PORT=8080 npm run dev --workspace=@workspace/api-server\" \"cross-env PORT=21181 BASE_PATH=/ npm run dev --workspace=@workspace/skill-engine\""
   },
   "devDependencies": {
+    "concurrently": "^9.2.1",
+    "cross-env": "^10.1.0",
     "prettier": "^3.8.1"
   }
 }
