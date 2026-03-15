@@ -11,6 +11,9 @@
     "backend/shared/api-client-react",
     "backend/scripts"
   ],
+  "overrides": {
+    "esbuild": "^0.25.0"
+  },
   "devDependencies": {
     "prettier": "^3.8.1"
   }
