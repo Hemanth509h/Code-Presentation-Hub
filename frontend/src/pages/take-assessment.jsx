@@ -24,7 +24,7 @@ export default function TakeAssessment() {
   const { data: assessment, isLoading } = useGetAssessment(assessmentId, {
     query: { enabled: !!assessmentId },
   });
-  const { mutate: submit, isPending: isSubmitting } = useSubmitAssessment();
+  const { mutate: submit, isPending: isSubmitting } = useSubmitAssessment(assessmentId);
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState({});
