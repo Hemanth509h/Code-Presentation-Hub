@@ -1,9 +1,9 @@
 packages:
   - frontend
   - backend
-  - shared/*
-  - scripts
-  - artifacts/mockup-sandbox
+  - backend/shared/*
+  - backend/scripts
+  - frontend/mockup-sandbox
 
 autoInstallPeers: false
 
