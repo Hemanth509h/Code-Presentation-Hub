@@ -16,7 +16,7 @@
   },
   "scripts": {
     "setup": "node scripts/setup-env.mjs",
-    "dev": "concurrently \"cross-env PORT=8080 npm run dev --workspace=@workspace/api-server\" \"cross-env PORT=21181 BASE_PATH=/ npm run dev --workspace=@workspace/skill-engine\""
+    "dev": "concurrently \"cross-env PORT=8080 npm run dev --workspace=@workspace/api-server\" \"cross-env PORT=5173 BASE_PATH=/ npm run dev --workspace=@workspace/skill-engine\""
   },
   "devDependencies": {
     "concurrently": "^9.2.1",
