@@ -1,20 +1,34 @@
 import { Link, useLocation } from "wouter";
-import { useAppStore } from "@/store/use-app-store";
+import { useAppStore, getUserRole } from "@/store/use-app-store";
 import { supabase } from "@/lib/supabase";
 import { Button } from "./ui-elements";
 import {
   ShieldCheck,
   UserCircle,
   LogOut,
-  LayoutDashboard,
   LogIn,
+  Users,
+  Shield,
 } from "lucide-react";
 import { AnimatePresence } from "framer-motion";
 
+const ROLE_BADGE = {
+  candidate: { label: "Candidate", color: "bg-blue-100 text-blue-700" },
+  recruiter: { label: "Recruiter", color: "bg-purple-100 text-purple-700" },
+  admin: { label: "Admin", color: "bg-red-100 text-red-700" },
+};
+
+const ROLE_ICON = {
+  candidate: <UserCircle className="w-4 h-4" />,
+  recruiter: <Users className="w-4 h-4" />,
+  admin: <Shield className="w-4 h-4" />,
+};
+
 export function Layout({ children }) {
   const [_, setLocation] = useLocation();
-  const { candidateId, isRecruiterMode, toggleRecruiterMode, logout, user } =
-    useAppStore();
+  const { candidateId, logout, user } = useAppStore();
+  const role = getUserRole(user);
+  const badge = ROLE_BADGE[role] || ROLE_BADGE.candidate;
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -39,24 +53,14 @@ export function Layout({ children }) {
           </Link>
 
           <div className="flex items-center gap-3">
-            {user && candidateId && !isRecruiterMode && (
-              <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-secondary/50 border border-secondary text-sm font-medium">
-                <UserCircle className="w-4 h-4 text-muted-foreground" />
-                <span className="text-muted-foreground">ID:</span>
-                <span className="text-foreground font-mono">{candidateId}</span>
+            {user && (
+              <div className={`hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium ${badge.color}`}>
+                {ROLE_ICON[role]}
+                {badge.label}
+                {role === "candidate" && candidateId && (
+                  <span className="font-mono text-xs opacity-75">· {candidateId}</span>
+                )}
               </div>
-            )}
-
-            {user && !candidateId && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={toggleRecruiterMode}
-                className="gap-2"
-              >
-                <LayoutDashboard className="w-4 h-4" />
-                {isRecruiterMode ? "Candidate View" : "Recruiter View"}
-              </Button>
             )}
 
             {user ? (

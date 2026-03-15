@@ -12,6 +12,8 @@ import {
   Star,
   Trophy,
   Lock,
+  Users,
+  UserCircle,
 } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -38,6 +40,7 @@ export default function Register() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [role, setRole] = useState("candidate");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -57,7 +60,11 @@ export default function Register() {
     }
 
     setLoading(true);
-    const { error } = await supabase.auth.signUp({ email, password });
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { role } },
+    });
     if (error) {
       setError(error.message);
       setLoading(false);
@@ -86,7 +93,9 @@ export default function Register() {
           </motion.div>
           <h2 className="text-2xl font-bold mb-2">Account Created!</h2>
           <p className="text-muted-foreground">
-            Redirecting you to set up your candidate profile…
+            {role === "candidate"
+              ? "Redirecting you to set up your candidate profile…"
+              : "Redirecting you to your dashboard…"}
           </p>
         </motion.div>
       </div>
@@ -95,7 +104,6 @@ export default function Register() {
 
   return (
     <div className="flex-grow flex min-h-[calc(100vh-64px)]">
-      {/* ── Left panel ── */}
       <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-slate-900 via-slate-800 to-teal-900 relative overflow-hidden flex-col justify-between p-12">
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="absolute -top-40 -right-40 w-96 h-96 bg-primary/20 rounded-full blur-3xl" />
@@ -144,13 +152,10 @@ export default function Register() {
         </div>
 
         <div className="relative z-10">
-          <p className="text-slate-500 text-sm">
-            Free to join. No credit card required.
-          </p>
+          <p className="text-slate-500 text-sm">Free to join. No credit card required.</p>
         </div>
       </div>
 
-      {/* ── Right panel ── */}
       <motion.div
         initial={{ opacity: 0, x: 20 }}
         animate={{ opacity: 1, x: 0 }}
@@ -158,7 +163,6 @@ export default function Register() {
         className="w-full lg:w-1/2 flex items-center justify-center p-6 sm:p-12 bg-background"
       >
         <div className="w-full max-w-md">
-          {/* Mobile logo */}
           <div className="lg:hidden flex items-center gap-3 mb-8">
             <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-primary to-accent flex items-center justify-center shadow-lg">
               <ShieldCheck className="w-5 h-5 text-white" />
@@ -169,11 +173,43 @@ export default function Register() {
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-foreground mb-2">Create your account</h1>
             <p className="text-muted-foreground">
-              Join SkillEngine — your identity stays completely anonymous
+              Join SkillEngine — choose your role to get started
             </p>
           </div>
 
           <form onSubmit={handleRegister} className="space-y-5">
+            <div className="space-y-2">
+              <Label>I am joining as</Label>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setRole("candidate")}
+                  className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${
+                    role === "candidate"
+                      ? "border-primary bg-primary/5 text-primary"
+                      : "border-input text-muted-foreground hover:border-primary/50"
+                  }`}
+                >
+                  <UserCircle className="w-6 h-6" />
+                  <span className="text-sm font-semibold">Candidate</span>
+                  <span className="text-xs opacity-70 text-center">Take assessments &amp; get hired</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRole("recruiter")}
+                  className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${
+                    role === "recruiter"
+                      ? "border-primary bg-primary/5 text-primary"
+                      : "border-input text-muted-foreground hover:border-primary/50"
+                  }`}
+                >
+                  <Users className="w-6 h-6" />
+                  <span className="text-sm font-semibold">Recruiter</span>
+                  <span className="text-xs opacity-70 text-center">View rankings &amp; hire talent</span>
+                </button>
+              </div>
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="email">Email address</Label>
               <Input
@@ -242,7 +278,7 @@ export default function Register() {
               disabled={loading}
             >
               {!loading && <UserPlus className="w-4 h-4" />}
-              Create Account
+              Create Account as {role === "candidate" ? "Candidate" : "Recruiter"}
             </Button>
           </form>
 

@@ -9,8 +9,9 @@ import CandidateDashboard from "@/pages/candidate-dashboard";
 import TakeAssessment from "@/pages/take-assessment";
 import CandidateResults from "@/pages/candidate-results";
 import RecruiterDashboard from "@/pages/recruiter-dashboard";
+import AdminDashboard from "@/pages/admin-dashboard";
 import NotFound from "@/pages/not-found";
-import { useAppStore } from "@/store/use-app-store";
+import { useAppStore, getUserRole } from "@/store/use-app-store";
 import { supabase } from "@/lib/supabase";
 
 const queryClient = new QueryClient();
@@ -18,17 +19,29 @@ const queryClient = new QueryClient();
 function AuthGuard({ children }) {
   const { user } = useAppStore();
   const [_, setLocation] = useLocation();
-
-  if (!user) {
-    return <Redirect to="/login" />;
-  }
+  if (!user) return <Redirect to="/login" />;
   return <>{children}</>;
 }
 
 function AppRouter() {
-  const { isRecruiterMode, candidateId, user } = useAppStore();
+  const { user, candidateId } = useAppStore();
+  const role = getUserRole(user);
 
-  if (user && isRecruiterMode && !candidateId) {
+  if (user && role === "admin") {
+    return (
+      <Layout>
+        <Switch>
+          <Route path="/" component={AdminDashboard} />
+          <Route path="/admin" component={AdminDashboard} />
+          <Route path="/login" component={() => <Redirect to="/" />} />
+          <Route path="/register" component={() => <Redirect to="/" />} />
+          <Route component={AdminDashboard} />
+        </Switch>
+      </Layout>
+    );
+  }
+
+  if (user && role === "recruiter") {
     return (
       <Layout>
         <Switch>
