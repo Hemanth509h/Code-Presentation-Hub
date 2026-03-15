@@ -3,7 +3,6 @@ packages:
   - backend
   - backend/shared/*
   - backend/scripts
-  - frontend/mockup-sandbox
 
 autoInstallPeers: false
 
