@@ -6,9 +6,10 @@ export const useAppStore = create(
     (set) => ({
       candidateId: null,
       user: null,
+      authLoading: true,
       setCandidateId: (id) => set({ candidateId: id }),
-      setUser: (user) => set({ user }),
-      logout: () => set({ candidateId: null, user: null }),
+      setUser: (user) => set({ user, authLoading: false }),
+      logout: () => set({ candidateId: null, user: null, authLoading: false }),
     }),
     {
       name: "skill-engine-storage",

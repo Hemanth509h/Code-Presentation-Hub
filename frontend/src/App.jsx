@@ -17,15 +17,29 @@ import { supabase } from "@/lib/supabase";
 const queryClient = new QueryClient();
 
 function AuthGuard({ children }) {
-  const { user } = useAppStore();
-  const [_, setLocation] = useLocation();
+  const { user, authLoading } = useAppStore();
+  if (authLoading) {
+    return (
+      <div className="flex-grow flex items-center justify-center">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary" />
+      </div>
+    );
+  }
   if (!user) return <Redirect to="/login" />;
   return <>{children}</>;
 }
 
 function AppRouter() {
-  const { user, candidateId } = useAppStore();
+  const { user, candidateId, authLoading } = useAppStore();
   const role = getUserRole(user);
+
+  if (authLoading) {
+    return (
+      <div className="flex-grow flex items-center justify-center">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary" />
+      </div>
+    );
+  }
 
   if (user && role === "admin") {
     return (
