@@ -35,7 +35,7 @@ outputType = "webview"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "PORT=8080 pnpm --filter @workspace/api-server run dev & PORT=21181 BASE_PATH=/ pnpm --filter @workspace/skill-engine run dev"
+args = "PORT=8080 npm run dev --workspace=@workspace/api-server & PORT=21181 BASE_PATH=/ npm run dev --workspace=@workspace/skill-engine"
 waitForPort = 21181
 
 [agent]

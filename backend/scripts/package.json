@@ -8,8 +8,8 @@
     "seed-assessments": "node ./src/seed-assessments.js"
   },
   "dependencies": {
-    "@workspace/db": "workspace:*",
-    "drizzle-orm": "catalog:"
+    "@workspace/db": "*",
+    "drizzle-orm": "^0.45.1"
   },
   "devDependencies": {}
 }

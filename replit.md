@@ -2,7 +2,7 @@
 
 ## Overview
 
-pnpm workspace monorepo using plain JavaScript. All TypeScript removed — source files are `.js` and `.jsx` only.
+npm workspace monorepo using plain JavaScript. All TypeScript removed — source files are `.js` and `.jsx` only.
 
 ## Project Structure
 
@@ -34,8 +34,7 @@ pnpm workspace monorepo using plain JavaScript. All TypeScript removed — sourc
 │   │   └── api-spec/          # OpenAPI spec
 │   └── scripts/               # Utility scripts (seed, etc.)
 │
-├── pnpm-workspace.yaml        # Workspace config + catalog
-└── package.json               # Root package
+└── package.json               # Root package with npm workspaces
 ```
 
 ## Stack
@@ -44,13 +43,13 @@ pnpm workspace monorepo using plain JavaScript. All TypeScript removed — sourc
 - **Backend**: Express 5, Node.js (`node --watch`)
 - **Database**: PostgreSQL + Drizzle ORM (Supabase)
 - **Auth**: Supabase Auth
-- **Package manager**: pnpm workspaces
+- **Package manager**: npm workspaces
 
 ## Running
 
 The main workflow runs both services:
-- **Backend**: port 8080 — `pnpm --filter @workspace/api-server run dev`
-- **Frontend**: port 21181 — `pnpm --filter @workspace/skill-engine run dev`
+- **Backend**: port 8080 — `npm run dev --workspace=@workspace/api-server`
+- **Frontend**: port 21181 — `npm run dev --workspace=@workspace/skill-engine`
 
 ## Key Design Notes
 
@@ -60,5 +59,5 @@ The main workflow runs both services:
 
 ## Database
 
-- Dev migrations: `pnpm --filter @workspace/db run push`
+- Dev migrations: `npm run push --workspace=@workspace/db`
 - Config: `backend/shared/db/drizzle.config.js` (requires `DATABASE_URL`)
