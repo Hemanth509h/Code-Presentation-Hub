@@ -3,17 +3,38 @@ import { persist } from "zustand/middleware";
 
 export const useAppStore = create(
   persist(
-    (set) => ({
+    (set, get) => ({
       candidateId: null,
       user: null,
       authLoading: true,
+      userCandidateMap: {},
+
       setCandidateId: (id) => set({ candidateId: id }),
-      setUser: (user) => set({ user, authLoading: false }),
-      logout: () => set({ candidateId: null, user: null, authLoading: false }),
+
+      linkUserToCandidate: (userId, candidateId) =>
+        set((state) => ({
+          candidateId,
+          userCandidateMap: { ...state.userCandidateMap, [userId]: candidateId },
+        })),
+
+      setUser: (user) => {
+        const { userCandidateMap } = get();
+        const restoredCandidateId = user ? (userCandidateMap[user.id] ?? null) : null;
+        set((state) => ({
+          user,
+          authLoading: false,
+          candidateId: restoredCandidateId ?? state.candidateId,
+        }));
+      },
+
+      logout: () => set({ user: null, authLoading: false }),
     }),
     {
       name: "skill-engine-storage",
-      partialize: (state) => ({ candidateId: state.candidateId }),
+      partialize: (state) => ({
+        candidateId: state.candidateId,
+        userCandidateMap: state.userCandidateMap,
+      }),
     }
   )
 );

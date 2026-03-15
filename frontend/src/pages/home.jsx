@@ -23,7 +23,7 @@ import { motion } from "framer-motion";
 
 export default function Home() {
   const [_, setLocation] = useLocation();
-  const { candidateId, setCandidateId } = useAppStore();
+  const { candidateId, linkUserToCandidate, user } = useAppStore();
   const { mutate: register, isPending } = useRegisterCandidate();
 
   const [skills, setSkills] = useState([]);
@@ -66,6 +66,7 @@ export default function Home() {
       },
       {
         onSuccess: (data) => {
+          if (user?.id) linkUserToCandidate(user.id, data.candidateId);
           setRegisteredProfile({ id: data.candidateId });
         },
       }
@@ -104,10 +105,7 @@ export default function Home() {
             <Button
               size="lg"
               className="w-full"
-              onClick={() => {
-                setCandidateId(registeredProfile.id);
-                setLocation("/dashboard");
-              }}
+              onClick={() => setLocation("/dashboard")}
             >
               Go to Dashboard <ArrowRight className="ml-2 w-5 h-5" />
             </Button>
