@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { supabase } from "../lib/supabase.js";
+import { pool } from "@workspace/db";
 import { RegisterCandidateBody } from "@workspace/api-zod";
 
 const router = Router();
@@ -130,6 +131,44 @@ router.get("/:candidateId/results", async (req, res) => {
     overallScore: overallScore !== null ? Math.round(overallScore * 10) / 10 : null,
     rank: null,
   });
+});
+
+router.get("/:candidateId/assigned-tests", async (req, res) => {
+  const { candidateId } = req.params;
+  try {
+    const { rows } = await pool.query(
+      `SELECT ct.custom_test_id, ct.title, ct.type, ct.description, ct.duration_minutes,
+              cta.assigned_at, cta.status,
+              cts.percentage, cts.passed, cts.completed_at,
+              COUNT(ctq.id) AS question_count
+       FROM custom_test_assignments cta
+       JOIN custom_tests ct ON cta.custom_test_id = ct.custom_test_id
+       LEFT JOIN custom_test_submissions cts
+         ON cta.custom_test_id = cts.custom_test_id AND cta.candidate_id = cts.candidate_id
+       LEFT JOIN custom_test_questions ctq ON ct.custom_test_id = ctq.custom_test_id
+       WHERE cta.candidate_id = $1
+       GROUP BY ct.custom_test_id, ct.title, ct.type, ct.description, ct.duration_minutes,
+                cta.assigned_at, cta.status, cts.percentage, cts.passed, cts.completed_at
+       ORDER BY cta.assigned_at DESC`,
+      [candidateId]
+    );
+
+    res.json(rows.map((r) => ({
+      customTestId: r.custom_test_id,
+      title: r.title,
+      type: r.type,
+      description: r.description,
+      durationMinutes: r.duration_minutes,
+      questionCount: parseInt(r.question_count),
+      assignedAt: r.assigned_at,
+      status: r.status,
+      percentage: r.percentage,
+      passed: r.passed,
+      completedAt: r.completed_at,
+    })));
+  } catch (err) {
+    res.status(500).json({ error: "db_error", message: err.message });
+  }
 });
 
 export default router;

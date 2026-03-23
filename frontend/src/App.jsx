@@ -7,6 +7,7 @@ import Login from "@/pages/login";
 import Register from "@/pages/register";
 import CandidateDashboard from "@/pages/candidate-dashboard";
 import TakeAssessment from "@/pages/take-assessment";
+import TakeCustomTest from "@/pages/take-custom-test";
 import CandidateResults from "@/pages/candidate-results";
 import RecruiterDashboard from "@/pages/recruiter-dashboard";
 import AdminDashboard from "@/pages/admin-dashboard";
@@ -94,6 +95,14 @@ function AppRouter() {
           component={() => (
             <AuthGuard>
               <TakeAssessment />
+            </AuthGuard>
+          )}
+        />
+        <Route
+          path="/custom-test/:testId"
+          component={() => (
+            <AuthGuard>
+              <TakeCustomTest />
             </AuthGuard>
           )}
         />
