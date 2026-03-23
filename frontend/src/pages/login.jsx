@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { supabase } from "@/lib/supabase";
+import { useAppStore } from "@/store/use-app-store";
 import { Button, Input, Label } from "@/components/ui-elements";
 import { ShieldCheck, LogIn, Eye, EyeOff, CheckCircle2, Zap, Users, BarChart3 } from "lucide-react";
 import { motion } from "framer-motion";
@@ -30,6 +30,7 @@ const features = [
 
 export default function Login() {
   const [_, setLocation] = useLocation();
+  const { setUser } = useAppStore();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -41,12 +42,24 @@ export default function Login() {
     setLoading(true);
     setError(null);
 
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) {
-      setError(error.message);
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.message || "Login failed");
+        setLoading(false);
+      } else {
+        setUser(data);
+        setLocation("/");
+      }
+    } catch (_) {
+      setError("Network error. Please try again.");
       setLoading(false);
-    } else {
-      setLocation("/");
     }
   };
 

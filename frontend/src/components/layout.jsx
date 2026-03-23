@@ -1,6 +1,5 @@
 import { Link, useLocation } from "wouter";
 import { useAppStore, getUserRole } from "@/store/use-app-store";
-import { supabase } from "@/lib/supabase";
 import { Button } from "./ui-elements";
 import {
   ShieldCheck,
@@ -31,8 +30,7 @@ export function Layout({ children }) {
   const badge = ROLE_BADGE[role] || ROLE_BADGE.candidate;
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
-    logout();
+    await logout();
     setLocation("/login");
   };
 

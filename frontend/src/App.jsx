@@ -12,7 +12,6 @@ import RecruiterDashboard from "@/pages/recruiter-dashboard";
 import AdminDashboard from "@/pages/admin-dashboard";
 import NotFound from "@/pages/not-found";
 import { useAppStore, getUserRole } from "@/store/use-app-store";
-import { supabase } from "@/lib/supabase";
 
 const queryClient = new QueryClient();
 
@@ -116,17 +115,10 @@ function AuthListener() {
   const { setUser } = useAppStore();
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-    });
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-    });
-
-    return () => subscription.unsubscribe();
+    fetch("/api/auth/me", { credentials: "include" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((user) => setUser(user))
+      .catch(() => setUser(null));
   }, [setUser]);
 
   return null;

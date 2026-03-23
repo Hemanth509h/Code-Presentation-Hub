@@ -27,7 +27,12 @@ export const useAppStore = create(
         }));
       },
 
-      logout: () => set({ user: null, authLoading: false }),
+      logout: async () => {
+        try {
+          await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
+        } catch (_) {}
+        set({ user: null, authLoading: false, candidateId: null });
+      },
     }),
     {
       name: "skill-engine-storage",
@@ -40,5 +45,5 @@ export const useAppStore = create(
 );
 
 export const getUserRole = (user) => {
-  return user?.user_metadata?.role || "candidate";
+  return user?.role || "candidate";
 };

@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { supabase } from "@/lib/supabase";
 import { Button, Input, Label } from "@/components/ui-elements";
 import {
   ShieldCheck,
@@ -60,18 +59,25 @@ export default function Register() {
     }
 
     setLoading(true);
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { data: { role } },
-    });
-    if (error) {
-      setError(error.message);
+    try {
+      const res = await fetch("/api/auth/register", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password, role }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.message || "Registration failed");
+        setLoading(false);
+      } else {
+        setSuccess(true);
+        setLoading(false);
+        setTimeout(() => setLocation("/login"), 2000);
+      }
+    } catch (_) {
+      setError("Network error. Please try again.");
       setLoading(false);
-    } else {
-      setSuccess(true);
-      setLoading(false);
-      setTimeout(() => setLocation("/"), 2000);
     }
   };
 
