@@ -1,9 +1,9 @@
 import { createClient } from "@supabase/supabase-js";
 
-const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseUrl = process.env.REACT_APP_SUPABASE_URL || process.env.SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-if (!supabaseUrl) throw new Error("SUPABASE_URL env var is required");
+if (!supabaseUrl) throw new Error("REACT_APP_SUPABASE_URL env var is required");
 if (!supabaseServiceKey) throw new Error("SUPABASE_SERVICE_ROLE_KEY env var is required");
 
 export const supabase = createClient(supabaseUrl, supabaseServiceKey, {
