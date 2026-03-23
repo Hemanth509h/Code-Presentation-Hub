@@ -4,7 +4,7 @@ import { useAppStore } from "@/store/use-app-store";
 import {
   useGetAssessment,
   useSubmitAssessment,
-} from "@workspace/api-client-react";
+} from "@/lib/api";
 import {
   AnimatedPage,
   Button,

@@ -4,7 +4,7 @@ import { useAppStore } from "@/store/use-app-store";
 import {
   useGetCandidateProfile,
   useListAssessments,
-} from "@workspace/api-client-react";
+} from "@/lib/api";
 import {
   AnimatedPage,
   Card,

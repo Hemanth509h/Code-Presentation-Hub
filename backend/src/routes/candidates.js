@@ -1,7 +1,6 @@
 import { Router } from "express";
 import { supabase } from "../lib/supabase.js";
 import { pool } from "@workspace/db";
-import { RegisterCandidateBody } from "@workspace/api-zod";
 
 const router = Router();
 
@@ -12,7 +11,8 @@ function generateCandidateId() {
 
 router.post("/register", async (req, res) => {
   try {
-    const body = RegisterCandidateBody.parse(req.body);
+    const body = req.body;
+
 
     let candidateId = generateCandidateId();
     let attempts = 0;

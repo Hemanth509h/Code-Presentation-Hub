@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useAppStore } from "@/store/use-app-store";
-import { useRegisterCandidate } from "@workspace/api-client-react";
+import { useRegisterCandidate } from "@/lib/api";
 import {
   AnimatedPage,
   Button,

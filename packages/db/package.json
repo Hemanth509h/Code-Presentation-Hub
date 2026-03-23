@@ -12,6 +12,7 @@
     "push-force": "drizzle-kit push --force --config ./drizzle.config.ts"
   },
   "dependencies": {
+    "@workspace/env": "*",
     "drizzle-orm": "^0.45.1",
     "pg": "^8.20.0",
     "zod": "^3.25.76"

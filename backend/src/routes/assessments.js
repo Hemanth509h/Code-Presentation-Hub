@@ -1,6 +1,5 @@
 import { Router } from "express";
 import { supabase } from "../lib/supabase.js";
-import { SubmitAssessmentBody } from "@workspace/api-zod";
 
 const router = Router();
 
@@ -71,7 +70,7 @@ router.get("/:assessmentId", async (req, res) => {
 router.post("/:assessmentId/submit", async (req, res) => {
   const { assessmentId } = req.params;
   try {
-    const body = SubmitAssessmentBody.parse(req.body);
+    const body = req.body;
 
     const { data: assessment } = await supabase
       .from("assessments")

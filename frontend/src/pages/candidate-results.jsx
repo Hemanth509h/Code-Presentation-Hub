@@ -1,6 +1,6 @@
 import { useLocation, Link } from "wouter";
 import { useAppStore } from "@/store/use-app-store";
-import { useGetCandidateResults } from "@workspace/api-client-react";
+import { useGetCandidateResults } from "@/lib/api";
 import {
   AnimatedPage,
   Card,

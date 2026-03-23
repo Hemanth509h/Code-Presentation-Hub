@@ -6,10 +6,7 @@
   "workspaces": [
     "frontend",
     "backend",
-    "backend/shared/db",
-    "backend/shared/api-zod",
-    "backend/shared/api-client-react",
-    "backend/scripts"
+    "packages/*"
   ],
   "overrides": {
     "esbuild": "^0.25.0"

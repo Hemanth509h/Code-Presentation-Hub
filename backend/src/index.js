@@ -1,7 +1,7 @@
 import app from "./app.js";
 import { pool } from "@workspace/db";
 
-const rawPort = process.env["PORT"];
+const rawPort = process.env["PORT"] || "8080";
 
 if (!rawPort) {
   throw new Error("PORT environment variable is required but was not provided.");

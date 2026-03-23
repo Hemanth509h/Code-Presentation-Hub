@@ -2,11 +2,11 @@ import { createClient } from "@supabase/supabase-js";
 import { getEnv } from "@workspace/env";
 
 const supabaseUrl = getEnv("SUPABASE_URL");
-const supabaseServiceKey = getEnv("SUPABASE_SERVICE_ROLE_KEY");
+const supabaseAnonKey = getEnv("SUPABASE_ANON_KEY");
 
 if (!supabaseUrl) throw new Error("SUPABASE_URL is required");
-if (!supabaseServiceKey) throw new Error("SUPABASE_SERVICE_ROLE_KEY is required");
+if (!supabaseAnonKey) throw new Error("SUPABASE_ANON_KEY is required");
 
-export const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+export const supabaseAnon = createClient(supabaseUrl, supabaseAnonKey, {
   auth: { persistSession: false },
 });

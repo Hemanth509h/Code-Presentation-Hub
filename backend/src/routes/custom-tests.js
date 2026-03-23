@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { pool } from "@workspace/db";
-import { requireAuth } from "../middleware/auth.js";
+import { requireAuth } from "./auth.js";
 import { randomUUID } from "crypto";
 
 const router = Router();

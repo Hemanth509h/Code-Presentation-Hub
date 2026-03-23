@@ -9,8 +9,6 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.99.1",
-    "@workspace/api-client-react": "*",
     "zustand": "^5.0.11"
   },
   "devDependencies": {
