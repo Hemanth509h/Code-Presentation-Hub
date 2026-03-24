@@ -146,6 +146,16 @@ router.post("/:testId/assign", requireAuth, async (req, res) => {
   }
 
   try {
+    let realCandidateId = candidateId;
+    if (candidateId.startsWith("CAND-")) {
+      const { data: aliasData } = await supabase
+        .from("candidate_aliases")
+        .select("candidate_id")
+        .eq("alias", candidateId)
+        .maybeSingle();
+      if (aliasData) realCandidateId = aliasData.candidate_id;
+    }
+
     const { data: test, error: tError } = await supabase
       .from("custom_tests")
       .select("custom_test_id")
@@ -157,14 +167,14 @@ router.post("/:testId/assign", requireAuth, async (req, res) => {
     const { data: candidate, error: cError } = await supabase
       .from("candidates")
       .select("candidate_id")
-      .eq("candidate_id", candidateId)
+      .eq("candidate_id", realCandidateId)
       .single();
     if (cError || !candidate) return res.status(404).json({ error: "not_found", message: "Candidate not found" });
 
     // UPSERT or Ignore if existing assignment
     const { error: aError } = await supabase
       .from("custom_test_assignments")
-      .upsert({ custom_test_id: testId, candidate_id: candidateId }, { onConflict: "custom_test_id, candidate_id", ignoreDuplicates: true });
+      .upsert({ custom_test_id: testId, candidate_id: realCandidateId }, { onConflict: "custom_test_id, candidate_id", ignoreDuplicates: true });
     if (aError) throw aError;
 
     res.json({ success: true, candidateId });

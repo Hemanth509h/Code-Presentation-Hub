@@ -11,10 +11,13 @@ export function AssignModal({ test, onClose, onAssigned }) {
   const [pool, setPool] = useState([]);
   const [loadingPool, setLoadingPool] = useState(true);
 
-  useState(() => {
-    fetch("/api/recruiters/blind-pool", { credentials: "include" })
+  useEffect(() => {
+    fetch("/api/recruiters/connections", { credentials: "include" })
       .then(r => r.ok ? r.json() : [])
-      .then(setPool)
+      .then(conns => {
+        const accepted = conns.filter(c => c.status === "accepted");
+        setPool(accepted);
+      })
       .finally(() => setLoadingPool(false));
   }, []);
 
@@ -74,14 +77,14 @@ export function AssignModal({ test, onClose, onAssigned }) {
                   <div className="max-h-48 overflow-y-auto divide-y">
                     {pool.map(c => (
                       <button
-                        key={c.maskedId}
+                        key={c.connectionId}
                         onClick={() => handleAssign(c.maskedId)}
                         disabled={loading}
                         className="w-full px-4 py-2.5 text-left hover:bg-white transition-colors flex items-center justify-between group"
                       >
                         <div className="flex flex-col">
                           <span className="text-sm font-semibold font-mono text-primary">{c.maskedId}</span>
-                          <span className="text-[10px] text-muted-foreground">{c.targetRole} · {c.experienceYears}y exp</span>
+                          <span className="text-[10px] text-muted-foreground">Connected Candidate</span>
                         </div>
                         <CheckCircle2 className="w-4 h-4 text-primary opacity-0 group-hover:opacity-100 transition-opacity" />
                       </button>
