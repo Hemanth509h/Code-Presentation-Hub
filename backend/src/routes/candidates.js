@@ -77,6 +77,23 @@ router.get("/:candidateId", async (req, res) => {
     .select("*", { count: "exact", head: true })
     .eq("candidate_id", candidateId);
 
+  let rank = null;
+  let roleRank = null;
+  if (candidate.overall_score !== null && candidate.overall_score !== undefined) {
+    const { data: allCandidates } = await supabase
+      .from("candidates")
+      .select("candidate_id, target_role")
+      .not("overall_score", "is", null)
+      .order("overall_score", { ascending: false });
+    
+    const overallIndex = (allCandidates ?? []).findIndex(c => c.candidate_id === candidateId);
+    if (overallIndex !== -1) rank = overallIndex + 1;
+
+    const roleCandidates = (allCandidates ?? []).filter(c => c.target_role === candidate.target_role);
+    const roleIndex = roleCandidates.findIndex(c => c.candidate_id === candidateId);
+    if (roleIndex !== -1) roleRank = roleIndex + 1;
+  }
+
   res.json({
     candidateId: candidate.candidate_id,
     targetRole: candidate.target_role,
@@ -85,6 +102,8 @@ router.get("/:candidateId", async (req, res) => {
     registeredAt: candidate.registered_at,
     completedAssessments: count ?? 0,
     overallScore: candidate.overall_score ?? null,
+    rank,
+    roleRank,
   });
 });
 

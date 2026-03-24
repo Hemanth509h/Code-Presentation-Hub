@@ -14,7 +14,7 @@ export default defineConfig({
     },
   },
   server: {
-    port: Number(process.env.PORT) || 5173,
+    port: 50959,
     host: "0.0.0.0",
     allowedHosts: true,
     proxy: {
@@ -29,7 +29,7 @@ export default defineConfig({
     emptyOutDir: true,
   },
   preview: {
-    port: Number(process.env.PORT) || 5173,
+    port: 50959,
     host: "0.0.0.0",
     allowedHosts: true,
   },

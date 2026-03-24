@@ -5,12 +5,18 @@ const router = Router();
 
 router.get("/rankings", async (req, res) => {
   const assessmentType = req.query.assessmentType;
+  const role = req.query.role;
 
-  const { data: candidates } = await supabase
+  let query = supabase
     .from("candidates")
     .select("*")
-    .not("overall_score", "is", null)
-    .order("overall_score", { ascending: false });
+    .not("overall_score", "is", null);
+
+  if (role && role !== "all") {
+    query = query.eq("target_role", role);
+  }
+
+  const { data: candidates } = await query.order("overall_score", { ascending: false });
 
   const ranked = await Promise.all(
     (candidates ?? []).map(async (c, idx) => {

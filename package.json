@@ -6,7 +6,7 @@
   "workspaces": [
     "frontend",
     "backend",
-    "packages/*"
+    "frontend/packages/*"
   ],
   "overrides": {
     "esbuild": "^0.25.0"

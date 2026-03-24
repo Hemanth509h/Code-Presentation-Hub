@@ -6,6 +6,8 @@ import assessmentsRouter from "./assessments.js";
 import recruitersRouter from "./recruiters.js";
 import adminRouter from "./admin.js";
 import customTestsRouter from "./custom-tests.js";
+import fairnessRouter from "./fairness.js";
+import chatRouter from "./chat.js";
 
 const router = Router();
 
@@ -16,5 +18,7 @@ router.use("/assessments", assessmentsRouter);
 router.use("/recruiters", recruitersRouter);
 router.use("/admin", adminRouter);
 router.use("/custom-tests", customTestsRouter);
+router.use("/fairness", fairnessRouter);
+router.use("/chat", chatRouter);
 
 export default router;
