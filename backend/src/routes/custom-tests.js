@@ -1,6 +1,5 @@
 import { Router } from "express";
 import { supabase } from "../lib/supabase.js";
-import { db, sync, initStorage } from "../utils/storage.js";
 import { requireAuth } from "../middleware/auth.js";
 import { randomUUID } from "crypto";
 
@@ -300,12 +299,10 @@ router.post("/:testId/submit", async (req, res) => {
       
       if (testInfo && testInfo.created_by) {
         const recruiterId = testInfo.created_by;
-        if (!db.shortlists[recruiterId]) db.shortlists[recruiterId] = [];
-        if (!db.shortlists[recruiterId].includes(candidateId)) {
-          db.shortlists[recruiterId].push(candidateId);
-          sync();
-          console.log(`[AutoShortlist] Added candidate ${candidateId} to recruiter ${recruiterId} shortlist after test completion.`);
-        }
+        await supabase
+          .from("recruiter_shortlists")
+          .upsert({ recruiter_id: recruiterId, candidate_id: candidateId }, { onConflict: "recruiter_id, candidate_id", ignoreDuplicates: true });
+        console.log(`[AutoShortlist] Added candidate ${candidateId} to recruiter ${recruiterId} shortlist after test completion.`);
       }
     } catch (err) {
       console.error("[AutoShortlist] Failed to update shortlist:", err);
