@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { AnimatedPage, Card, CardContent, Badge } from "@/shared/components/ui-elements";
-import { Shield, Users, UserCircle, Briefcase, Trash2, ChevronDown, RefreshCw, Search } from "lucide-react";
+import { AnimatedPage, Card, CardContent, Badge, Button, Input, Label } from "@/shared/components/ui-elements";
+import { Shield, Users, UserCircle, Briefcase, Trash2, ChevronDown, RefreshCw, Search, Plus, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { CandidateManagementTab } from "./components/candidate-management-tab";
@@ -86,6 +86,7 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState("users");
   const [search, setSearch] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(null);
+  const [isUserModalOpen, setIsUserModalOpen] = useState(false);
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["admin-users"],
@@ -191,15 +192,20 @@ export default function AdminDashboard() {
       <Card className="overflow-hidden">
         <div className="p-6 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <h3 className="text-xl font-bold">All Users</h3>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <input
-              type="text"
-              placeholder="Search by email or role..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9 pr-4 py-2 text-sm rounded-xl border border-input bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary w-64"
-            />
+          <div className="flex gap-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <input
+                type="text"
+                placeholder="Search by email or role..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-9 pr-4 py-2 text-sm rounded-xl border border-input bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary w-64"
+              />
+            </div>
+            <Button onClick={() => setIsUserModalOpen(true)} className="gap-2 shadow-lg shadow-primary/20">
+              <Plus className="w-4 h-4" /> Add User
+            </Button>
           </div>
         </div>
 
@@ -286,6 +292,82 @@ export default function AdminDashboard() {
       ) : (
         <CandidateManagementTab />
       )}
+
+      {isUserModalOpen && (
+        <UserModal 
+          onClose={() => setIsUserModalOpen(false)} 
+          onSuccess={() => { setIsUserModalOpen(false); qc.invalidateQueries({ queryKey: ["admin-users"] }); }} 
+        />
+      )}
     </AnimatedPage>
+  );
+}
+
+function UserModal({ onClose, onSuccess }) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [role, setRole] = useState("recruiter");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/users`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password, role })
+      });
+      if (!res.ok) throw new Error((await res.json()).message || "Failed to create user.");
+      onSuccess();
+    } catch (err) {
+      setError(err.message);
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <Card className="w-full max-w-md shadow-2xl border-primary/20">
+        <div className="p-5 border-b flex justify-between items-center bg-secondary/50 rounded-t-xl">
+          <h3 className="font-bold text-lg">Create New User</h3>
+          <button onClick={onClose} className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"><X className="w-5 h-5" /></button>
+        </div>
+        <CardContent className="p-6">
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <Label>Email (for login)</Label>
+              <Input type="email" value={email} onChange={e => setEmail(e.target.value)} required placeholder="user@example.com" />
+            </div>
+            <div>
+              <Label>Password</Label>
+              <Input type="password" value={password} onChange={e => setPassword(e.target.value)} required placeholder="Min 6 chars" />
+            </div>
+            <div>
+              <Label>Role</Label>
+              <select 
+                value={role} 
+                onChange={(e) => setRole(e.target.value)}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <option value="candidate">Candidate</option>
+                <option value="recruiter">Recruiter</option>
+                <option value="admin">Admin</option>
+              </select>
+            </div>
+            {error && (
+              <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-sm">
+                ! {error}
+              </div>
+            )}
+            <Button type="submit" className="w-full mt-4" size="lg" isLoading={loading}>
+              Create User
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+    </div>
   );
 }

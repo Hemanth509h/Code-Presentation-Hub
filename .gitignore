@@ -45,8 +45,6 @@ Thumbs.db
 .github/instructions/nx.instructions.md
 
 # Environment variables (local overrides only)
-.env.local
-.env.*.local
 
 # Replit
 .cache/

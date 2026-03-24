@@ -23,6 +23,26 @@ router.get("/users", async (_req, res) => {
   }
 });
 
+router.post("/users", async (req, res) => {
+  const { email, password, role } = req.body;
+  if (!["candidate", "recruiter", "admin"].includes(role)) {
+    return res.status(400).json({ error: "invalid_role", message: "Role must be candidate, recruiter, or admin" });
+  }
+
+  try {
+    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+      email,
+      password,
+      user_metadata: { role },
+      email_confirm: true,
+    });
+    if (authError) throw authError;
+    res.status(201).json({ success: true, user: authData.user });
+  } catch (err) {
+    res.status(500).json({ error: "server_error", message: err.message });
+  }
+});
+
 router.patch("/users/:userId/role", async (req, res) => {
   const { userId } = req.params;
   const { role } = req.body;

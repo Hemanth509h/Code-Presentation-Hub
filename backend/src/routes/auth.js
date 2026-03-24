@@ -34,7 +34,10 @@ router.post("/login", async (req, res) => {
 });
 
 router.post("/register", async (req, res) => {
-  const { email, password } = req.body; const role = "candidate";
+  const { email, password, role = "candidate" } = req.body;
+  if (!["candidate", "recruiter"].includes(role)) {
+    return res.status(400).json({ error: "invalid_role", message: "Role must be candidate or recruiter" });
+  }
   if (!email || !password) {
     return res.status(400).json({ error: "missing_fields", message: "Email and password are required" });
   }

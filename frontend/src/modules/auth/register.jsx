@@ -39,7 +39,7 @@ export default function Register() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const role = "candidate";
+  const [role, setRole] = useState("candidate");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -184,6 +184,29 @@ export default function Register() {
           </div>
 
           <form onSubmit={handleRegister} className="space-y-5">
+            <div className="flex bg-secondary/30 p-1.5 rounded-xl mb-4 border border-border/50">
+              <button
+                type="button"
+                onClick={() => setRole("candidate")}
+                className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-semibold rounded-lg transition-all ${
+                  role === "candidate" ? "bg-background shadow-sm text-foreground border border-border/50" : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+                }`}
+              >
+                <UserCircle className="w-4 h-4" />
+                Candidate
+              </button>
+              <button
+                type="button"
+                onClick={() => setRole("recruiter")}
+                className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-semibold rounded-lg transition-all ${
+                  role === "recruiter" ? "bg-background shadow-sm text-foreground border border-border/50" : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+                }`}
+              >
+                <Users className="w-4 h-4" />
+                Recruiter
+              </button>
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="email">Email address</Label>
               <Input
@@ -252,7 +275,7 @@ export default function Register() {
               disabled={loading}
             >
               {!loading && <UserPlus className="w-4 h-4" />}
-              Create Dedicated Candidate Account
+              Create {role === "candidate" ? "Candidate" : "Recruiter"} Account
             </Button>
           </form>
 
