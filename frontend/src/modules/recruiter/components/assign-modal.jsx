@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button, Input, Label } from "@/shared/components/ui-elements";
 import { X, CheckCircle2, Send } from "lucide-react";
 import { motion } from "framer-motion";

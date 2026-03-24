@@ -147,6 +147,8 @@ router.post("/:testId/assign", requireAuth, async (req, res) => {
 
   try {
     let realCandidateId = candidateId;
+    console.log(`[AssignTest] Attempting to assign test ${testId} to candidate ${candidateId}`);
+    
     if (candidateId.startsWith("CAND-")) {
       const { data: aliasData } = await supabase
         .from("candidate_aliases")
@@ -162,24 +164,35 @@ router.post("/:testId/assign", requireAuth, async (req, res) => {
       .eq("custom_test_id", testId)
       .eq("created_by", req.user.id)
       .single();
-    if (tError || !test) return res.status(404).json({ error: "not_found", message: "Test not found" });
+    if (tError || !test) {
+      console.error(`[AssignTest] Test not found or not owned by recruiter:`, tError);
+      return res.status(404).json({ error: "not_found", message: "Test not found" });
+    }
 
     const { data: candidate, error: cError } = await supabase
       .from("candidates")
       .select("candidate_id")
       .eq("candidate_id", realCandidateId)
       .single();
-    if (cError || !candidate) return res.status(404).json({ error: "not_found", message: "Candidate not found" });
+    if (cError || !candidate) {
+      console.error(`[AssignTest] Candidate not found in DB:`, realCandidateId, cError);
+      return res.status(404).json({ error: "not_found", message: "Candidate not found" });
+    }
 
     // UPSERT or Ignore if existing assignment
     const { error: aError } = await supabase
       .from("custom_test_assignments")
       .upsert({ custom_test_id: testId, candidate_id: realCandidateId }, { onConflict: "custom_test_id, candidate_id", ignoreDuplicates: true });
-    if (aError) throw aError;
+    if (aError) {
+      console.error(`[AssignTest] Failed to upsert assignment:`, aError);
+      throw aError;
+    }
 
+    console.log(`[AssignTest] Success! assigned to ${realCandidateId}`);
     res.json({ success: true, candidateId });
   } catch (err) {
-    res.status(500).json({ error: "db_error", message: err.message });
+    console.error(`[AssignTest] Server Error:`, err);
+    res.status(500).json({ error: "server_error", message: err.message });
   }
 });
 
