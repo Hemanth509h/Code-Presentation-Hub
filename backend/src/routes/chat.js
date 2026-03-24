@@ -1,27 +1,13 @@
 import { Router } from "express";
 import { supabase } from "../lib/supabase.js";
-import { pool } from "../lib/db.js";
 
 const router = Router();
 
 router.get("/init", async (req, res) => {
-  try {
-    const initSql = `
-      CREATE TABLE IF NOT EXISTS chat_messages (
-        id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-        custom_test_id text NOT NULL,
-        candidate_id text NOT NULL,
-        sender_role text NOT NULL,
-        sender_id text NOT NULL,
-        message text NOT NULL,
-        created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
-      );
-    `;
-    await pool.query(initSql);
-    res.json({ success: true, message: "Chat table initialized via API." });
-  } catch (err) {
-    res.status(500).json({ error: "db_init_error", message: err.message });
-  }
+  res.status(400).json({ 
+    error: "manual_creation_required", 
+    message: "Cannot execute DDL via REST API. Please execute the chat_messages CREATE TABLE SQL in your Supabase Dashboard SQL Editor." 
+  });
 });
 
 router.get("/:customTestId/:candidateId", async (req, res) => {

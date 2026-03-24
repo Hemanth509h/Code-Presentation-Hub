@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { pool } from "../lib/db.js";
+import { supabase } from "../lib/supabase.js";
 import { requireAuth } from "../middleware/auth.js";
 import { randomUUID } from "crypto";
 
@@ -14,19 +14,28 @@ router.post("/", requireAuth, async (req, res) => {
   const testId = `CT-${Date.now().toString(36).toUpperCase()}`;
 
   try {
-    await pool.query(
-      `INSERT INTO custom_tests (custom_test_id, title, type, description, duration_minutes, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
-      [testId, title, type || "technical", description || "", durationMinutes || 30, req.user.id]
-    );
+    const { error: testError } = await supabase.from("custom_tests").insert({
+      custom_test_id: testId,
+      title,
+      type: type || "technical",
+      description: description || "",
+      duration_minutes: durationMinutes || 30,
+      created_by: req.user.id
+    });
+    if (testError) throw testError;
 
-    for (const q of questions) {
-      await pool.query(
-        `INSERT INTO custom_test_questions (question_id, custom_test_id, question_text, question_type, options, correct_option, points)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-        [randomUUID(), testId, q.text, q.type || "multiple_choice", q.options || null, q.correctOption ?? null, q.points || 1]
-      );
-    }
+    const questionsToInsert = questions.map((q) => ({
+      question_id: randomUUID(),
+      custom_test_id: testId,
+      question_text: q.text,
+      question_type: q.type || "multiple_choice",
+      options: q.options || null,
+      correct_option: q.correctOption ?? null,
+      points: q.points || 1
+    }));
+
+    const { error: qError } = await supabase.from("custom_test_questions").insert(questionsToInsert);
+    if (qError) throw qError;
 
     res.status(201).json({ customTestId: testId, title });
   } catch (err) {
@@ -36,28 +45,27 @@ router.post("/", requireAuth, async (req, res) => {
 
 router.get("/", requireAuth, async (req, res) => {
   try {
-    const { rows } = await pool.query(
-      `SELECT ct.custom_test_id, ct.title, ct.type, ct.description, ct.duration_minutes, ct.created_at,
-              COUNT(DISTINCT ctq.id) AS question_count,
-              COUNT(DISTINCT cta.id) AS assignment_count
-       FROM custom_tests ct
-       LEFT JOIN custom_test_questions ctq ON ct.custom_test_id = ctq.custom_test_id
-       LEFT JOIN custom_test_assignments cta ON ct.custom_test_id = cta.custom_test_id
-       WHERE ct.created_by = $1
-       GROUP BY ct.custom_test_id, ct.title, ct.type, ct.description, ct.duration_minutes, ct.created_at
-       ORDER BY ct.created_at DESC`,
-      [req.user.id]
-    );
-    res.json(rows.map((t) => ({
+    // Supabase standard queries can select related count natively
+    const { data: customTests, error } = await supabase
+      .from("custom_tests")
+      .select("*, custom_test_questions(count), custom_test_assignments(count)")
+      .eq("created_by", req.user.id)
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+
+    const formatted = customTests.map((t) => ({
       customTestId: t.custom_test_id,
       title: t.title,
       type: t.type,
       description: t.description,
       durationMinutes: t.duration_minutes,
       createdAt: t.created_at,
-      questionCount: parseInt(t.question_count),
-      assignmentCount: parseInt(t.assignment_count),
-    })));
+      questionCount: t.custom_test_questions?.[0]?.count ?? 0,
+      assignmentCount: t.custom_test_assignments?.[0]?.count ?? 0,
+    }));
+
+    res.json(formatted);
   } catch (err) {
     res.status(500).json({ error: "db_error", message: err.message });
   }
@@ -66,27 +74,29 @@ router.get("/", requireAuth, async (req, res) => {
 router.get("/:testId", requireAuth, async (req, res) => {
   const { testId } = req.params;
   try {
-    const { rows: [test] } = await pool.query(
-      `SELECT * FROM custom_tests WHERE custom_test_id = $1 AND created_by = $2`,
-      [testId, req.user.id]
-    );
+    const { data: test, error: tError } = await supabase
+      .from("custom_tests")
+      .select("*")
+      .eq("custom_test_id", testId)
+      .eq("created_by", req.user.id)
+      .single();
+    if (tError) throw tError;
     if (!test) return res.status(404).json({ error: "not_found", message: "Test not found" });
 
-    const { rows: questions } = await pool.query(
-      `SELECT * FROM custom_test_questions WHERE custom_test_id = $1 ORDER BY id`,
-      [testId]
-    );
+    const { data: questions, error: qError } = await supabase
+      .from("custom_test_questions")
+      .select("*")
+      .eq("custom_test_id", testId)
+      .order("id");
+    if (qError) throw qError;
 
-    const { rows: assignments } = await pool.query(
-      `SELECT cta.candidate_id, cta.assigned_at, cta.status,
-              cts.score, cts.max_score, cts.percentage, cts.passed, cts.completed_at AS submitted_at
-       FROM custom_test_assignments cta
-       LEFT JOIN custom_test_submissions cts
-         ON cta.custom_test_id = cts.custom_test_id AND cta.candidate_id = cts.candidate_id
-       WHERE cta.custom_test_id = $1
-       ORDER BY cta.assigned_at DESC`,
-      [testId]
-    );
+    // Fetch assignments and their submissions
+    const { data: assignments, error: aError } = await supabase
+      .from("custom_test_assignments")
+      .select("*, custom_test_submissions(*)")
+      .eq("custom_test_id", testId)
+      .order("assigned_at", { ascending: false });
+    if (aError) throw aError;
 
     res.json({
       customTestId: test.custom_test_id,
@@ -103,16 +113,19 @@ router.get("/:testId", requireAuth, async (req, res) => {
         correctOption: q.correct_option,
         points: q.points,
       })),
-      assignments: assignments.map((a) => ({
-        candidateId: a.candidate_id,
-        assignedAt: a.assigned_at,
-        status: a.status,
-        score: a.score,
-        maxScore: a.max_score,
-        percentage: a.percentage,
-        passed: a.passed,
-        submittedAt: a.submitted_at,
-      })),
+      assignments: assignments.map((a) => {
+        const sub = a.custom_test_submissions?.[0]; // One-to-one relation expected
+        return {
+          candidateId: a.candidate_id,
+          assignedAt: a.assigned_at,
+          status: a.status,
+          score: sub?.score ?? null,
+          maxScore: sub?.max_score ?? null,
+          percentage: sub?.percentage ?? null,
+          passed: sub?.passed ?? null,
+          submittedAt: sub?.completed_at ?? null,
+        };
+      }),
     });
   } catch (err) {
     res.status(500).json({ error: "db_error", message: err.message });
@@ -127,23 +140,26 @@ router.post("/:testId/assign", requireAuth, async (req, res) => {
   }
 
   try {
-    const { rows: [test] } = await pool.query(
-      `SELECT * FROM custom_tests WHERE custom_test_id = $1 AND created_by = $2`,
-      [testId, req.user.id]
-    );
-    if (!test) return res.status(404).json({ error: "not_found", message: "Test not found" });
+    const { data: test, error: tError } = await supabase
+      .from("custom_tests")
+      .select("custom_test_id")
+      .eq("custom_test_id", testId)
+      .eq("created_by", req.user.id)
+      .single();
+    if (tError || !test) return res.status(404).json({ error: "not_found", message: "Test not found" });
 
-    const { rows: [candidate] } = await pool.query(
-      `SELECT candidate_id FROM candidates WHERE candidate_id = $1`,
-      [candidateId]
-    );
-    if (!candidate) return res.status(404).json({ error: "not_found", message: "Candidate not found" });
+    const { data: candidate, error: cError } = await supabase
+      .from("candidates")
+      .select("candidate_id")
+      .eq("candidate_id", candidateId)
+      .single();
+    if (cError || !candidate) return res.status(404).json({ error: "not_found", message: "Candidate not found" });
 
-    await pool.query(
-      `INSERT INTO custom_test_assignments (custom_test_id, candidate_id)
-       VALUES ($1, $2) ON CONFLICT DO NOTHING`,
-      [testId, candidateId]
-    );
+    // UPSERT or Ignore if existing assignment
+    const { error: aError } = await supabase
+      .from("custom_test_assignments")
+      .upsert({ custom_test_id: testId, candidate_id: candidateId }, { onConflict: "custom_test_id, candidate_id", ignoreDuplicates: true });
+    if (aError) throw aError;
 
     res.json({ success: true, candidateId });
   } catch (err) {
@@ -154,11 +170,15 @@ router.post("/:testId/assign", requireAuth, async (req, res) => {
 router.delete("/:testId", requireAuth, async (req, res) => {
   const { testId } = req.params;
   try {
-    const { rowCount } = await pool.query(
-      `DELETE FROM custom_tests WHERE custom_test_id = $1 AND created_by = $2`,
-      [testId, req.user.id]
-    );
-    if (rowCount === 0) return res.status(404).json({ error: "not_found", message: "Test not found" });
+    const { data, error } = await supabase
+      .from("custom_tests")
+      .delete()
+      .eq("custom_test_id", testId)
+      .eq("created_by", req.user.id)
+      .select();
+    
+    if (error) throw error;
+    if (!data || data.length === 0) return res.status(404).json({ error: "not_found", message: "Test not found" });
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: "db_error", message: err.message });
@@ -168,16 +188,19 @@ router.delete("/:testId", requireAuth, async (req, res) => {
 router.get("/:testId/take", async (req, res) => {
   const { testId } = req.params;
   try {
-    const { rows: [test] } = await pool.query(
-      `SELECT * FROM custom_tests WHERE custom_test_id = $1`,
-      [testId]
-    );
-    if (!test) return res.status(404).json({ error: "not_found", message: "Test not found" });
+    const { data: test, error: tError } = await supabase
+      .from("custom_tests")
+      .select("*")
+      .eq("custom_test_id", testId)
+      .single();
+    if (tError || !test) return res.status(404).json({ error: "not_found", message: "Test not found" });
 
-    const { rows: questions } = await pool.query(
-      `SELECT question_id, question_text, question_type, options, points FROM custom_test_questions WHERE custom_test_id = $1 ORDER BY id`,
-      [testId]
-    );
+    const { data: questions, error: qError } = await supabase
+      .from("custom_test_questions")
+      .select("question_id, question_text, question_type, options, points")
+      .eq("custom_test_id", testId)
+      .order("id");
+    if (qError) throw qError;
 
     res.json({
       customTestId: test.custom_test_id,
@@ -207,18 +230,21 @@ router.post("/:testId/submit", async (req, res) => {
   }
 
   try {
-    const { rows: [assignment] } = await pool.query(
-      `SELECT * FROM custom_test_assignments WHERE custom_test_id = $1 AND candidate_id = $2`,
-      [testId, candidateId]
-    );
-    if (!assignment) {
+    const { data: assignment, error: aError } = await supabase
+      .from("custom_test_assignments")
+      .select("*")
+      .eq("custom_test_id", testId)
+      .eq("candidate_id", candidateId)
+      .single();
+    if (aError || !assignment) {
       return res.status(403).json({ error: "not_assigned", message: "You are not assigned to this test" });
     }
 
-    const { rows: questions } = await pool.query(
-      `SELECT * FROM custom_test_questions WHERE custom_test_id = $1`,
-      [testId]
-    );
+    const { data: questions, error: qError } = await supabase
+      .from("custom_test_questions")
+      .select("*")
+      .eq("custom_test_id", testId);
+    if (qError) throw qError;
 
     let score = 0;
     let maxScore = 0;
@@ -229,7 +255,7 @@ router.post("/:testId/submit", async (req, res) => {
         if (q.question_type === "multiple_choice" && ans.selectedOption != null) {
           if (ans.selectedOption === q.correct_option) score += q.points;
         } else if ((q.question_type === "coding" || q.question_type === "short_answer") && ans.textAnswer?.trim().length > 10) {
-          score += q.points * 0.7;
+          score += q.points * 0.7; // Simple evaluation
         }
       }
     }
@@ -237,18 +263,25 @@ router.post("/:testId/submit", async (req, res) => {
     const percentage = maxScore > 0 ? Math.round((score / maxScore) * 1000) / 10 : 0;
     const passed = percentage >= 60;
 
-    await pool.query(
-      `INSERT INTO custom_test_submissions (custom_test_id, candidate_id, score, max_score, percentage, passed)
-       VALUES ($1, $2, $3, $4, $5, $6)
-       ON CONFLICT (custom_test_id, candidate_id)
-       DO UPDATE SET score = $3, max_score = $4, percentage = $5, passed = $6, completed_at = NOW()`,
-      [testId, candidateId, score, maxScore, percentage, passed]
-    );
+    const { error: upsertError } = await supabase
+      .from("custom_test_submissions")
+      .upsert({
+        custom_test_id: testId,
+        candidate_id: candidateId,
+        score,
+        max_score: maxScore,
+        percentage,
+        passed,
+        completed_at: new Date().toISOString()
+      }, { onConflict: "custom_test_id, candidate_id" });
+    if (upsertError) throw upsertError;
 
-    await pool.query(
-      `UPDATE custom_test_assignments SET status = 'completed' WHERE custom_test_id = $1 AND candidate_id = $2`,
-      [testId, candidateId]
-    );
+    const { error: updateError } = await supabase
+      .from("custom_test_assignments")
+      .update({ status: 'completed' })
+      .eq("custom_test_id", testId)
+      .eq("candidate_id", candidateId);
+    if (updateError) throw updateError;
 
     let feedback = "";
     if (percentage >= 90) feedback = "Outstanding! You demonstrated exceptional mastery.";

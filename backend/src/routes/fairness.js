@@ -1,25 +1,28 @@
 import { Router } from "express";
-import { pool } from "../lib/db.js";
+import { supabase } from "../lib/supabase.js";
 
 const router = Router();
 
 router.get("/results", async (req, res) => {
   try {
-    const query = `
-      SELECT 
-        s.custom_test_id,
-        t.title as test_title,
-        s.candidate_id,
-        s.score,
-        s.max_score,
-        s.percentage,
-        s.passed,
-        s.completed_at
-      FROM custom_test_submissions s
-      JOIN custom_tests t ON s.custom_test_id = t.custom_test_id
-      ORDER BY s.completed_at DESC
-    `;
-    const { rows } = await pool.query(query);
+    const { data: submissions, error: sError } = await supabase
+      .from("custom_test_submissions")
+      .select("*, custom_tests(title)")
+      .order("completed_at", { ascending: false });
+
+    if (sError) throw sError;
+
+    const rows = submissions.map(s => ({
+      custom_test_id: s.custom_test_id,
+      test_title: s.custom_tests?.title || "Unknown Test",
+      candidate_id: s.candidate_id,
+      score: s.score,
+      max_score: s.max_score,
+      percentage: s.percentage,
+      passed: s.passed,
+      completed_at: s.completed_at,
+    }));
+
 
     const candidateMap = new Map();
     let currentCandidateIndex = 1;

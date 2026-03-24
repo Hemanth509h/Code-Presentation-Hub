@@ -1,6 +1,5 @@
 import { Router } from "express";
 import { supabase } from "../lib/supabase.js";
-import { pool } from "../lib/db.js";
 
 const router = Router();
 
@@ -155,36 +154,37 @@ router.get("/:candidateId/results", async (req, res) => {
 router.get("/:candidateId/assigned-tests", async (req, res) => {
   const { candidateId } = req.params;
   try {
-    const { rows } = await pool.query(
-      `SELECT ct.custom_test_id, ct.title, ct.type, ct.description, ct.duration_minutes,
-              cta.assigned_at, cta.status,
-              cts.percentage, cts.passed, cts.completed_at,
-              COUNT(ctq.id) AS question_count
-       FROM custom_test_assignments cta
-       JOIN custom_tests ct ON cta.custom_test_id = ct.custom_test_id
-       LEFT JOIN custom_test_submissions cts
-         ON cta.custom_test_id = cts.custom_test_id AND cta.candidate_id = cts.candidate_id
-       LEFT JOIN custom_test_questions ctq ON ct.custom_test_id = ctq.custom_test_id
-       WHERE cta.candidate_id = $1
-       GROUP BY ct.custom_test_id, ct.title, ct.type, ct.description, ct.duration_minutes,
-                cta.assigned_at, cta.status, cts.percentage, cts.passed, cts.completed_at
-       ORDER BY cta.assigned_at DESC`,
-      [candidateId]
-    );
+    const { data: assignments, error: aError } = await supabase
+      .from("custom_test_assignments")
+      .select("*")
+      .eq("candidate_id", candidateId)
+      .order("assigned_at", { ascending: false });
 
-    res.json(rows.map((r) => ({
-      customTestId: r.custom_test_id,
-      title: r.title,
-      type: r.type,
-      description: r.description,
-      durationMinutes: r.duration_minutes,
-      questionCount: parseInt(r.question_count),
-      assignedAt: r.assigned_at,
-      status: r.status,
-      percentage: r.percentage,
-      passed: r.passed,
-      completedAt: r.completed_at,
-    })));
+    if (aError) throw aError;
+
+    const formatted = [];
+    for (const a of assignments || []) {
+      const { data: ct } = await supabase.from("custom_tests").select("*, custom_test_questions(count)").eq("custom_test_id", a.custom_test_id).single();
+      const { data: cts } = await supabase.from("custom_test_submissions").select("*").eq("custom_test_id", a.custom_test_id).eq("candidate_id", candidateId).maybeSingle();
+      
+      if (ct) {
+        formatted.push({
+          customTestId: ct.custom_test_id,
+          title: ct.title,
+          type: ct.type,
+          description: ct.description,
+          durationMinutes: ct.duration_minutes,
+          questionCount: ct.custom_test_questions?.[0]?.count ?? 0,
+          assignedAt: a.assigned_at,
+          status: a.status,
+          percentage: cts?.percentage ?? null,
+          passed: cts?.passed ?? null,
+          completedAt: cts?.completed_at ?? null,
+        });
+      }
+    }
+
+    res.json(formatted);
   } catch (err) {
     res.status(500).json({ error: "db_error", message: err.message });
   }

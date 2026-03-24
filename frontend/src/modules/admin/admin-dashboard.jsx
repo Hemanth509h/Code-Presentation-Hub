@@ -4,6 +4,7 @@ import { Shield, Users, UserCircle, Briefcase, Trash2, ChevronDown, RefreshCw, S
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { CandidateManagementTab } from "./components/candidate-management-tab";
+import { RecruiterManagementTab } from "./components/recruiter-management-tab";
 
 const ROLES = ["candidate", "recruiter", "admin"];
 
@@ -186,6 +187,12 @@ export default function AdminDashboard() {
         >
           Candidate Profiles
         </button>
+        <button 
+          onClick={() => setActiveTab("recruiters")} 
+          className={`pb-3 border-b-2 font-medium text-sm transition-colors ${activeTab === 'recruiters' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
+        >
+          Recruiter Profiles
+        </button>
       </div>
 
       {activeTab === "users" ? (
@@ -289,8 +296,10 @@ export default function AdminDashboard() {
           </div>
         )}
       </Card>
-      ) : (
+      ) : activeTab === "candidates" ? (
         <CandidateManagementTab />
+      ) : (
+        <RecruiterManagementTab />
       )}
 
       {isUserModalOpen && (
