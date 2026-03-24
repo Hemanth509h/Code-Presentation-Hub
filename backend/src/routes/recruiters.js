@@ -18,19 +18,18 @@ function getShortlist(recruiterId) {
 }
 
 function maskId(id) {
+  // We now use the real candidate_id as the "alias" per user request
   if (!db.masks[id]) {
-    const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-    const idx = db.maskCounter++;
-    const alias = idx < 26 ? `Candidate ${letters[idx]}` : `Candidate ${idx + 1}`;
-    db.masks[id] = alias;
-    db.revMasks[alias] = id;
+    db.masks[id] = id;
+    db.revMasks[id] = id;
     sync();
   }
   return db.masks[id];
 }
 
 function unMaskId(alias) {
-  return db.revMasks[alias] ?? null;
+  // If no mapping found, assume the alias IS the real ID (since we changed the logic)
+  return db.revMasks[alias] ?? alias;
 }
 
 // ─── Rankings (existing, untouched) ──────────────────────────────────────────
@@ -129,15 +128,18 @@ router.get("/blind-pool", requireAuth, async (req, res) => {
     if (error) throw error;
 
     const recruiterId = req.user.id;
+    console.log(`[BlindPool] Fetching for recruiter: ${recruiterId}, role: ${role}`);
+    console.log(`[BlindPool] Found ${candidates?.length || 0} candidates with scores in Supabase.`);
+
     const shortlist = getShortlist(recruiterId);
-    const myConnections = [...connectionStore.values()].filter(c => c.recruiterId === recruiterId);
+    const myConnections = Object.values(db.connections).filter(c => c.recruiterId === recruiterId);
 
     const pool = (candidates ?? []).map((c, idx) => {
       const masked = maskId(c.candidate_id);
       const conn = Object.values(db.connections).find(con => con.candidateId === c.candidate_id && con.recruiterId === recruiterId);
       return {
         rank: idx + 1,
-        maskedId: masked,
+        maskedId: c.candidate_id, // Use real ID instead of masked alias
         targetRole: c.target_role,
         skills: c.skills,
         experienceYears: c.experience_years,
@@ -148,6 +150,7 @@ router.get("/blind-pool", requireAuth, async (req, res) => {
       };
     });
 
+    console.log(`[BlindPool] Returning ${pool.length} masked candidates.`);
     res.json(pool);
   } catch (err) {
     res.status(500).json({ error: "db_error", message: err.message });
