@@ -13,9 +13,16 @@ const COLORS = ["#0f766e", "#0ea5e9", "#6366f1", "#8b5cf6", "#a855f7"];
 export function AnalyticsTab() {
   const [filterType, setFilterType] = useState("all");
   const [roleFilter, setRoleFilter] = useState("all");
+  const [scoreFilter, setScoreFilter] = useState(null);
   const [activeChatCandidate, setActiveChatCandidate] = useState(null);
   const { data: stats, isLoading: loadingStats } = useGetRecruitmentStats();
   const { data: rankings, isLoading: loadingRankings } = useGetCandidateRankings({ assessmentType: filterType, role: roleFilter });
+
+  const displayedRankings = (rankings || []).filter(r => {
+    if (!scoreFilter) return true;
+    const score = r.overallScore || 0;
+    return score >= scoreFilter.min && score <= scoreFilter.max;
+  });
 
   if (loadingStats || loadingRankings) {
     return (
@@ -52,13 +59,31 @@ export function AnalyticsTab() {
             <h3 className="font-semibold mb-6">Score Distribution</h3>
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={stats?.scoreDistribution || []}>
+                <BarChart
+                  data={stats?.scoreDistribution || []}
+                  onClick={(state) => {
+                    if (state && state.activePayload && state.activePayload.length) {
+                      const rangeStr = state.activePayload[0].payload.range;
+                      if (scoreFilter?.range === rangeStr) {
+                        setScoreFilter(null);
+                      } else {
+                        const [min, max] = rangeStr.split("-").map(Number);
+                        setScoreFilter({ range: rangeStr, min, max });
+                      }
+                    }
+                  }}
+                  style={{ cursor: "pointer" }}
+                >
                   <XAxis dataKey="range" tick={{ fontSize: 12 }} />
                   <YAxis tick={{ fontSize: 12 }} />
                   <RechartsTooltip />
                   <Bar dataKey="count" radius={[6, 6, 0, 0]}>
-                    {(stats?.scoreDistribution || []).map((_, i) => (
-                      <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                    {(stats?.scoreDistribution || []).map((entry, i) => (
+                      <Cell
+                        key={i}
+                        fill={COLORS[i % COLORS.length]}
+                        opacity={!scoreFilter || scoreFilter.range === entry.range ? 1 : 0.3}
+                      />
                     ))}
                   </Bar>
                 </BarChart>
@@ -82,9 +107,21 @@ export function AnalyticsTab() {
                       cy="50%"
                       outerRadius={90}
                       label={({ role, percent }) => `${role} ${(percent * 100).toFixed(0)}%`}
+                      onClick={(data) => {
+                        if (roleFilter === data.role) {
+                          setRoleFilter("all");
+                        } else {
+                          setRoleFilter(data.role);
+                        }
+                      }}
+                      style={{ cursor: "pointer" }}
                     >
-                      {stats.roleDistribution.map((_, i) => (
-                        <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                      {stats.roleDistribution.map((entry, i) => (
+                        <Cell
+                          key={i}
+                          fill={COLORS[i % COLORS.length]}
+                          opacity={roleFilter === "all" || roleFilter === entry.role ? 1 : 0.3}
+                        />
                       ))}
                     </Pie>
                     <RechartsTooltip />
@@ -147,7 +184,7 @@ export function AnalyticsTab() {
                 </tr>
               </thead>
               <tbody>
-                {(rankings || []).map((c) => (
+                {displayedRankings.map((c) => (
                   <tr key={c.candidateId} className="border-b last:border-0 hover:bg-secondary/30 transition-colors">
                     <td className="py-3 px-3">
                       <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${
