@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { AnimatedPage } from "@/shared/components/ui-elements";
-import { Trophy, ClipboardList } from "lucide-react";
+import { Trophy, ClipboardList, Shield } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { AnalyticsTab } from "@/modules/recruiter/components/analytics-tab";
 import { CustomTestsTab } from "@/modules/recruiter/components/custom-tests-tab";
+import { BlindRecruitmentTab } from "@/modules/recruiter/components/blind-recruitment-tab";
 
 export default function RecruiterDashboard() {
   const [activeTab, setActiveTab] = useState("analytics");
@@ -11,6 +12,7 @@ export default function RecruiterDashboard() {
   const TABS = [
     { id: "analytics", label: "Analytics", icon: <Trophy className="w-4 h-4" /> },
     { id: "custom-tests", label: "Custom Tests", icon: <ClipboardList className="w-4 h-4" /> },
+    { id: "blind-hiring", label: "Blind Hiring", icon: <Shield className="w-4 h-4" /> },
   ];
 
   return (
@@ -45,7 +47,7 @@ export default function RecruiterDashboard() {
           exit={{ opacity: 0, y: -8 }}
           transition={{ duration: 0.15 }}
         >
-          {activeTab === "analytics" ? <AnalyticsTab /> : <CustomTestsTab />}
+          {activeTab === "analytics" ? <AnalyticsTab /> : activeTab === "custom-tests" ? <CustomTestsTab /> : <BlindRecruitmentTab />}
         </motion.div>
       </AnimatePresence>
     </AnimatedPage>

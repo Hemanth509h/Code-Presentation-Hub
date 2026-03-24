@@ -1,8 +1,41 @@
 import { Router } from "express";
 import { supabase } from "../lib/supabase.js";
+import { requireAuth } from "../middleware/auth.js";
 
 const router = Router();
 
+// ─── In-memory stores (prototype) ────────────────────────────────────────────
+// shortlistStore: Map<recruiterId, Set<candidateId>>
+const shortlistStore = new Map();
+// connectionStore: Map<connectionId, { recruiterId, candidateId, status, createdAt }>
+const connectionStore = new Map();
+let connectionCounter = 1;
+
+function getShortlist(recruiterId) {
+  if (!shortlistStore.has(recruiterId)) shortlistStore.set(recruiterId, new Set());
+  return shortlistStore.get(recruiterId);
+}
+
+function maskId(id) {
+  // Deterministic alias so the same real ID always maps to the same mask within a session
+  if (!maskId._map) maskId._map = new Map();
+  if (!maskId._counter) maskId._counter = 0;
+  if (!maskId._map.has(id)) {
+    const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    const idx = maskId._counter++;
+    const alias = idx < 26 ? `Candidate ${letters[idx]}` : `Candidate ${idx + 1}`;
+    maskId._map.set(id, alias);
+    maskId._revMap = maskId._revMap || new Map();
+    maskId._revMap.set(alias, id);
+  }
+  return maskId._map.get(id);
+}
+
+function unMaskId(alias) {
+  return maskId._revMap?.get(alias) ?? null;
+}
+
+// ─── Rankings (existing, untouched) ──────────────────────────────────────────
 router.get("/rankings", async (req, res) => {
   const assessmentType = req.query.assessmentType;
   const role = req.query.role;
@@ -12,9 +45,7 @@ router.get("/rankings", async (req, res) => {
     .select("*")
     .not("overall_score", "is", null);
 
-  if (role && role !== "all") {
-    query = query.eq("target_role", role);
-  }
+  if (role && role !== "all") query = query.eq("target_role", role);
 
   const { data: candidates } = await query.order("overall_score", { ascending: false });
 
@@ -59,6 +90,7 @@ router.get("/rankings", async (req, res) => {
   res.json(ranked);
 });
 
+// ─── Stats (existing, untouched) ─────────────────────────────────────────────
 router.get("/stats", async (_req, res) => {
   const { data: allCandidates } = await supabase.from("candidates").select("*");
   const { count: assessmentsCompleted } = await supabase
@@ -67,45 +99,181 @@ router.get("/stats", async (_req, res) => {
 
   const candidates = allCandidates ?? [];
   const totalCandidates = candidates.length;
-
   const scored = candidates.filter((c) => c.overall_score !== null);
   const avgScore =
     scored.length > 0
       ? scored.reduce((sum, c) => sum + c.overall_score, 0) / scored.length
       : 0;
-
   const topPerformers = candidates.filter((c) => (c.overall_score ?? 0) >= 80).length;
-
   const roleMap = new Map();
-  for (const c of candidates) {
-    roleMap.set(c.target_role, (roleMap.get(c.target_role) ?? 0) + 1);
-  }
+  for (const c of candidates) roleMap.set(c.target_role, (roleMap.get(c.target_role) ?? 0) + 1);
   const roleDistribution = Array.from(roleMap.entries()).map(([role, count]) => ({ role, count }));
-
   const ranges = [
-    { range: "0-20", min: 0, max: 20 },
-    { range: "21-40", min: 21, max: 40 },
-    { range: "41-60", min: 41, max: 60 },
-    { range: "61-80", min: 61, max: 80 },
+    { range: "0-20", min: 0, max: 20 }, { range: "21-40", min: 21, max: 40 },
+    { range: "41-60", min: 41, max: 60 }, { range: "61-80", min: 61, max: 80 },
     { range: "81-100", min: 81, max: 100 },
   ];
-
   const scoreDistribution = ranges.map(({ range, min, max }) => ({
     range,
-    count: candidates.filter((c) => {
-      const s = c.overall_score ?? 0;
-      return s >= min && s <= max;
-    }).length,
+    count: candidates.filter((c) => { const s = c.overall_score ?? 0; return s >= min && s <= max; }).length,
   }));
 
-  res.json({
-    totalCandidates,
-    assessmentsCompleted: assessmentsCompleted ?? 0,
-    averageScore: Math.round(avgScore * 10) / 10,
-    topPerformers,
-    roleDistribution,
-    scoreDistribution,
+  res.json({ totalCandidates, assessmentsCompleted: assessmentsCompleted ?? 0, averageScore: Math.round(avgScore * 10) / 10, topPerformers, roleDistribution, scoreDistribution });
+});
+
+// ─── Blind Recruitment: Anonymous Pool ───────────────────────────────────────
+router.get("/blind-pool", requireAuth, async (req, res) => {
+  try {
+    const role = req.query.role;
+    let query = supabase.from("candidates").select("*").not("overall_score", "is", null);
+    if (role && role !== "all") query = query.eq("target_role", role);
+    const { data: candidates, error } = await query.order("overall_score", { ascending: false });
+    if (error) throw error;
+
+    const recruiterId = req.user.id;
+    const shortlist = getShortlist(recruiterId);
+    const myConnections = [...connectionStore.values()].filter(c => c.recruiterId === recruiterId);
+
+    const pool = (candidates ?? []).map((c, idx) => {
+      const masked = maskId(c.candidate_id);
+      const conn = myConnections.find(con => con.candidateId === c.candidate_id);
+      return {
+        rank: idx + 1,
+        maskedId: masked,
+        targetRole: c.target_role,
+        skills: c.skills,
+        experienceYears: c.experience_years,
+        overallScore: c.overall_score ?? 0,
+        isShortlisted: shortlist.has(masked),
+        connectionStatus: conn?.status ?? null,
+        connectionId: conn?.id ?? null,
+      };
+    });
+
+    res.json(pool);
+  } catch (err) {
+    res.status(500).json({ error: "db_error", message: err.message });
+  }
+});
+
+// ─── Shortlist ────────────────────────────────────────────────────────────────
+router.post("/shortlist/:maskedId", requireAuth, (req, res) => {
+  const { maskedId } = req.params;
+  const recruiterId = req.user.id;
+  const shortlist = getShortlist(recruiterId);
+  shortlist.add(maskedId);
+  res.json({ success: true, maskedId, shortlisted: true });
+});
+
+router.delete("/shortlist/:maskedId", requireAuth, (req, res) => {
+  const { maskedId } = req.params;
+  const recruiterId = req.user.id;
+  getShortlist(recruiterId).delete(maskedId);
+  res.json({ success: true, maskedId, shortlisted: false });
+});
+
+router.get("/shortlist", requireAuth, async (req, res) => {
+  try {
+    const recruiterId = req.user.id;
+    const shortlistedMasked = [...getShortlist(recruiterId)];
+    // Enrich with live data (still masked)
+    const { data: allCandidates } = await supabase.from("candidates").select("*");
+    const myConnections = [...connectionStore.values()].filter(c => c.recruiterId === recruiterId);
+
+    const items = shortlistedMasked.map(masked => {
+      const realId = unMaskId(masked);
+      const c = (allCandidates ?? []).find(x => x.candidate_id === realId);
+      const conn = myConnections.find(con => con.candidateId === realId);
+      return {
+        maskedId: masked,
+        targetRole: c?.target_role ?? "Unknown",
+        skills: c?.skills ?? [],
+        experienceYears: c?.experience_years ?? 0,
+        overallScore: c?.overall_score ?? 0,
+        connectionStatus: conn?.status ?? null,
+        connectionId: conn?.id ?? null,
+      };
+    });
+    res.json(items);
+  } catch (err) {
+    res.status(500).json({ error: "db_error", message: err.message });
+  }
+});
+
+// ─── Connections ──────────────────────────────────────────────────────────────
+router.post("/connect/:maskedId", requireAuth, (req, res) => {
+  const { maskedId } = req.params;
+  const { message } = req.body;
+  const recruiterId = req.user.id;
+  const realId = unMaskId(maskedId);
+
+  if (!realId) return res.status(404).json({ error: "not_found", message: "Candidate alias not found" });
+
+  // Check for existing connection
+  const existing = [...connectionStore.values()].find(
+    c => c.recruiterId === recruiterId && c.candidateId === realId
+  );
+  if (existing) return res.status(409).json({ error: "conflict", message: "Interest already sent" });
+
+  const id = `CONN-${connectionCounter++}`;
+  connectionStore.set(id, {
+    id,
+    recruiterId,
+    candidateId: realId,
+    maskedId,
+    message: message || "",
+    status: "pending",
+    createdAt: new Date().toISOString(),
   });
+
+  res.status(201).json({ success: true, connectionId: id });
+});
+
+router.get("/connections", requireAuth, (req, res) => {
+  const recruiterId = req.user.id;
+  const myConns = [...connectionStore.values()].filter(c => c.recruiterId === recruiterId);
+
+  const result = myConns.map(c => ({
+    connectionId: c.id,
+    maskedId: c.maskedId,
+    // Only reveal real ID on acceptance
+    realCandidateId: c.status === "accepted" ? c.candidateId : null,
+    status: c.status,
+    message: c.message,
+    createdAt: c.createdAt,
+  }));
+
+  res.json(result);
+});
+
+// ─── Candidate: view pending requests ────────────────────────────────────────
+router.get("/pending-for-candidate/:candidateId", (req, res) => {
+  const { candidateId } = req.params;
+  const pending = [...connectionStore.values()]
+    .filter(c => c.candidateId === candidateId)
+    .map(c => ({
+      connectionId: c.id,
+      recruiterAlias: `Recruiter ${c.recruiterId.slice(0, 6)}`,
+      message: c.message,
+      status: c.status,
+      createdAt: c.createdAt,
+    }));
+  res.json(pending);
+});
+
+router.post("/respond/:connectionId", (req, res) => {
+  const { connectionId } = req.params;
+  const { decision } = req.body; // "accepted" | "declined"
+
+  const conn = connectionStore.get(connectionId);
+  if (!conn) return res.status(404).json({ error: "not_found" });
+  if (!["accepted", "declined"].includes(decision)) {
+    return res.status(400).json({ error: "Invalid decision. Use 'accepted' or 'declined'." });
+  }
+
+  conn.status = decision;
+  connectionStore.set(connectionId, conn);
+  res.json({ success: true, connectionId, status: decision });
 });
 
 export default router;

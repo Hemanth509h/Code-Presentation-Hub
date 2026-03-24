@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { CandidateManagementTab } from "./components/candidate-management-tab";
 import { RecruiterManagementTab } from "./components/recruiter-management-tab";
+import AnonymizedResultsDashboard from "./anonymized-results-dashboard";
 
 const ROLES = ["candidate", "recruiter", "admin"];
 
@@ -174,24 +175,30 @@ export default function AdminDashboard() {
         </Card>
       </div>
 
-      <div className="flex border-b border-border mb-6 gap-8">
+      <div className="flex border-b border-border mb-6 gap-8 overflow-x-auto">
         <button 
           onClick={() => setActiveTab("users")} 
-          className={`pb-3 border-b-2 font-medium text-sm transition-colors ${activeTab === 'users' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
+          className={`pb-3 border-b-2 font-medium text-sm transition-colors whitespace-nowrap ${activeTab === 'users' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
         >
           System Users
         </button>
         <button 
           onClick={() => setActiveTab("candidates")} 
-          className={`pb-3 border-b-2 font-medium text-sm transition-colors ${activeTab === 'candidates' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
+          className={`pb-3 border-b-2 font-medium text-sm transition-colors whitespace-nowrap ${activeTab === 'candidates' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
         >
           Candidate Profiles
         </button>
         <button 
           onClick={() => setActiveTab("recruiters")} 
-          className={`pb-3 border-b-2 font-medium text-sm transition-colors ${activeTab === 'recruiters' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
+          className={`pb-3 border-b-2 font-medium text-sm transition-colors whitespace-nowrap ${activeTab === 'recruiters' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
         >
           Recruiter Profiles
+        </button>
+        <button 
+          onClick={() => setActiveTab("anonymized")} 
+          className={`pb-3 border-b-2 font-medium text-sm transition-colors whitespace-nowrap ${activeTab === 'anonymized' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
+        >
+          🛡️ Fairness & Rankings
         </button>
       </div>
 
@@ -298,8 +305,10 @@ export default function AdminDashboard() {
       </Card>
       ) : activeTab === "candidates" ? (
         <CandidateManagementTab />
-      ) : (
+      ) : activeTab === "recruiters" ? (
         <RecruiterManagementTab />
+      ) : (
+        <AnonymizedResultsDashboard />
       )}
 
       {isUserModalOpen && (

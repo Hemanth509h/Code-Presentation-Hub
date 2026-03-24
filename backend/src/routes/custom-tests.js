@@ -90,13 +90,19 @@ router.get("/:testId", requireAuth, async (req, res) => {
       .order("id");
     if (qError) throw qError;
 
-    // Fetch assignments and their submissions
+    // Fetch assignments and their submissions manually to avoid PostgREST relationship issues on composite keys
     const { data: assignments, error: aError } = await supabase
       .from("custom_test_assignments")
-      .select("*, custom_test_submissions(*)")
+      .select("*")
       .eq("custom_test_id", testId)
       .order("assigned_at", { ascending: false });
     if (aError) throw aError;
+
+    const { data: submissions, error: sError } = await supabase
+      .from("custom_test_submissions")
+      .select("*")
+      .eq("custom_test_id", testId);
+    if (sError) throw sError;
 
     res.json({
       customTestId: test.custom_test_id,
@@ -114,7 +120,7 @@ router.get("/:testId", requireAuth, async (req, res) => {
         points: q.points,
       })),
       assignments: assignments.map((a) => {
-        const sub = a.custom_test_submissions?.[0]; // One-to-one relation expected
+        const sub = submissions.find(s => s.candidate_id === a.candidate_id);
         return {
           candidateId: a.candidate_id,
           assignedAt: a.assigned_at,

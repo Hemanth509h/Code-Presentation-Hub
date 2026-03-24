@@ -13,6 +13,7 @@ import {
   Button,
 } from "@/shared/components/ui-elements";
 import { ChatBox } from "@/shared/components/chat-box";
+import { CandidateConnections } from "@/modules/candidate/candidate-connections";
 import {
   Clock,
   HelpCircle,
@@ -212,6 +213,8 @@ export default function CandidateDashboard() {
           </div>
         </div>
       </div>
+
+      <CandidateConnections candidateId={candidateId} />
 
       <AssignedTestsSection candidateId={candidateId} />
 
