@@ -21,7 +21,7 @@ async function maskId(id) {
       .select("alias")
       .eq("candidate_id", id)
       .maybeSingle();
-    
+
     if (sError) console.error("[MaskId] Select error:", sError);
     if (existing) return existing.alias;
 
@@ -29,18 +29,18 @@ async function maskId(id) {
     const { count, error: cError } = await supabase
       .from("candidate_aliases")
       .select("*", { count: "exact", head: true });
-    
+
     if (cError) console.error("[MaskId] Count error:", cError);
     const alias = `CAND-${String((count || 0) + 1).padStart(3, '0')}`;
-    
+
     console.log(`[MaskId] Creating new alias ${alias} for ${id}`);
-    
+
     const { data: created, error: iError } = await supabase
       .from("candidate_aliases")
       .insert({ candidate_id: id, alias })
       .select("alias")
       .single();
-    
+
     if (iError) console.error("[MaskId] Insert error:", iError);
     if (created) console.log(`[MaskId] Successfully created alias ${created.alias}`);
 
@@ -58,11 +58,11 @@ async function unMaskId(alias) {
       .select("candidate_id")
       .eq("alias", alias)
       .maybeSingle();
-    
+
     if (error) console.error("[UnMaskId] Error:", error);
     if (data) console.log(`[UnMaskId] ${alias} -> ${data.candidate_id}`);
     else console.log(`[UnMaskId] No mapping for ${alias}, returning as is`);
-    
+
     return data?.candidate_id || alias;
   } catch (err) {
     console.error("[UnMaskId] Unexpected error:", err);
@@ -170,28 +170,33 @@ router.get("/blind-pool", requireAuth, async (req, res) => {
     console.log(`[BlindPool] Fetching for recruiter: ${recruiterId}, role: ${role}`);
     console.log(`[BlindPool] Found ${candidates?.length || 0} candidates with scores in Supabase.`);
 
-    const shortlist = getShortlist(recruiterId);
-    const myConnections = Object.values(db.connections).filter(c => c.recruiterId === recruiterId);
+    const shortlist = await getShortlist(recruiterId);
+    const { data: conns } = await supabase
+      .from("recruiter_connections")
+      .select("*")
+      .eq("recruiter_id", recruiterId);
 
-    const pool = (candidates ?? []).map((c, idx) => {
-      const masked = maskId(c.candidate_id);
-      const conn = Object.values(db.connections).find(con => con.candidateId === c.candidate_id && con.recruiterId === recruiterId);
+    const poolPromises = (candidates ?? []).map(async (c, idx) => {
+      const masked = await maskId(c.candidate_id);
+      const conn = (conns || []).find(con => con.candidate_id === c.candidate_id);
       return {
         rank: idx + 1,
-        maskedId: c.candidate_id, // Use real ID instead of masked alias
+        maskedId: masked,
         targetRole: c.target_role,
         skills: c.skills,
         experienceYears: c.experience_years,
         overallScore: c.overall_score ?? 0,
-        isShortlisted: shortlist.includes(masked),
+        isShortlisted: shortlist.includes(c.candidate_id),
         connectionStatus: conn?.status ?? null,
         connectionId: conn?.id ?? null,
       };
     });
 
+    const pool = await Promise.all(poolPromises);
     console.log(`[BlindPool] Returning ${pool.length} masked candidates.`);
     res.json(pool);
   } catch (err) {
+    console.error(`[BlindPool] Error: ${err.message}`);
     res.status(500).json({ error: "db_error", message: err.message });
   }
 });
@@ -200,7 +205,7 @@ router.post("/shortlist/:maskedId", requireAuth, async (req, res) => {
   const { maskedId } = req.params;
   const recruiterId = req.user.id;
   const realId = await unMaskId(maskedId);
-  
+
   await supabase
     .from("recruiter_shortlists")
     .upsert({ recruiter_id: recruiterId, candidate_id: realId }, { onConflict: "recruiter_id, candidate_id", ignoreDuplicates: true });
@@ -226,7 +231,7 @@ router.get("/shortlist", requireAuth, async (req, res) => {
   try {
     const recruiterId = req.user.id;
     const shortlistedIds = await getShortlist(recruiterId);
-    
+
     const { data: allCandidates } = await supabase.from("candidates").select("*");
     const { data: conns } = await supabase
       .from("recruiter_connections")
@@ -274,11 +279,11 @@ router.post("/connect/:maskedId", requireAuth, async (req, res) => {
       .eq("recruiter_id", recruiterId)
       .eq("candidate_id", realId)
       .maybeSingle();
-      
+
     if (existing) return res.status(409).json({ error: "conflict", message: "Interest already sent" });
 
     const id = `CONN-${Math.floor(Math.random() * 900000 + 100000)}`;
-    
+
     const { error: insertError } = await supabase
       .from("recruiter_connections")
       .insert({
@@ -320,7 +325,7 @@ router.get("/connections", requireAuth, async (req, res) => {
   const result = (conns || []).map(c => {
     const assignment = (assignments || []).find(a => a.candidate_id === c.candidate_id);
     const isShortlisted = shortlistedIds.includes(c.candidate_id);
-    
+
     return {
       connectionId: c.id,
       maskedId: c.masked_id,
@@ -329,7 +334,7 @@ router.get("/connections", requireAuth, async (req, res) => {
       status: c.status,
       message: c.message,
       createdAt: c.created_at,
-      customTestId: assignment?.custom_test_id || null, 
+      customTestId: assignment?.custom_test_id || null,
     };
   });
 
@@ -363,7 +368,7 @@ router.post("/respond/:connectionId", async (req, res) => {
     .select("*")
     .eq("id", connectionId)
     .single();
-    
+
   if (!conn) return res.status(404).json({ error: "not_found" });
   if (!["accepted", "declined"].includes(decision)) {
     return res.status(400).json({ error: "Invalid decision. Use 'accepted' or 'declined'." });
@@ -391,9 +396,9 @@ router.post("/respond/:connectionId", async (req, res) => {
         const testId = tests[0].custom_test_id;
         await supabase
           .from("custom_test_assignments")
-          .upsert({ 
-            custom_test_id: testId, 
-            candidate_id: candidateId 
+          .upsert({
+            custom_test_id: testId,
+            candidate_id: candidateId
           }, { onConflict: "custom_test_id, candidate_id", ignoreDuplicates: true });
 
         // 3. Send automated welcome message via chat
@@ -421,7 +426,7 @@ router.get("/debug/stats", async (req, res) => {
     const { count: sCount } = await supabase.from("recruiter_shortlists").select("*", { count: "exact", head: true });
     const { count: aCount } = await supabase.from("candidate_aliases").select("*", { count: "exact", head: true });
     const { count: canCount } = await supabase.from("candidates").select("*", { count: "exact", head: true });
-    
+
     res.json({
       connections: cCount,
       shortlists: sCount,
