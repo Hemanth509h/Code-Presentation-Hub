@@ -61,7 +61,7 @@ router.delete("/users/:userId", async (req, res) => {
 
 router.get("/candidates", async (_req, res) => {
   try {
-    const { data: candidates, error } = await supabase.from("candidates").select("*").order("created_at", { ascending: false });
+    const { data: candidates, error } = await supabase.from("candidates").select("*").order("registered_at", { ascending: false });
     if (error) throw error;
     res.json(candidates);
   } catch (err) {

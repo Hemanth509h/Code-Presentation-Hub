@@ -19,7 +19,7 @@ export default defineConfig({
     allowedHosts: true,
     proxy: {
       "/api": {
-        target: "https://code-presentation-hub-1.onrender.com",
+        target: "http://localhost:8080",
         changeOrigin: true,
       },
     },
