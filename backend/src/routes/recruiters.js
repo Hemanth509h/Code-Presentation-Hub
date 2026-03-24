@@ -179,12 +179,11 @@ router.get("/blind-pool", requireAuth, async (req, res) => {
       .select("*")
       .eq("recruiter_id", recruiterId);
 
-    const poolPromises = (candidates ?? []).map(async (c, idx) => {
-      const masked = await maskId(c.candidate_id);
+    const pool = (candidates ?? []).map((c, idx) => {
       const conn = (conns || []).find(con => con.candidate_id === c.candidate_id);
       return {
         rank: idx + 1,
-        maskedId: masked,
+        maskedId: c.candidate_id,
         targetRole: c.target_role,
         skills: c.skills,
         experienceYears: c.experience_years,
@@ -195,8 +194,7 @@ router.get("/blind-pool", requireAuth, async (req, res) => {
       };
     });
 
-    const pool = await Promise.all(poolPromises);
-    console.log(`[BlindPool] Returning ${pool.length} masked candidates.`);
+    console.log(`[BlindPool] Returning ${pool.length} candidates.`);
     res.json(pool);
   } catch (err) {
     console.error(`[BlindPool] Error: ${err.message}`);
@@ -207,7 +205,7 @@ router.get("/blind-pool", requireAuth, async (req, res) => {
 router.post("/shortlist/:maskedId", requireAuth, async (req, res) => {
   const { maskedId } = req.params;
   const recruiterId = req.user.id;
-  const realId = await unMaskId(maskedId);
+  const realId = maskedId; // Masking bypassed
 
   await supabase
     .from("recruiter_shortlists")
@@ -219,7 +217,7 @@ router.post("/shortlist/:maskedId", requireAuth, async (req, res) => {
 router.delete("/shortlist/:maskedId", requireAuth, async (req, res) => {
   const { maskedId } = req.params;
   const recruiterId = req.user.id;
-  const realId = await unMaskId(maskedId);
+  const realId = maskedId; // Masking bypassed
 
   await supabase
     .from("recruiter_shortlists")
@@ -241,12 +239,11 @@ router.get("/shortlist", requireAuth, async (req, res) => {
       .select("*")
       .eq("recruiter_id", recruiterId);
 
-    const itemsPromises = shortlistedIds.map(async realId => {
-      const masked = await maskId(realId);
+    const items = shortlistedIds.map(realId => {
       const c = (allCandidates ?? []).find(x => x.candidate_id === realId);
       const conn = (conns || []).find(con => con.candidate_id === realId);
       return {
-        maskedId: masked,
+        maskedId: realId,
         targetRole: c?.target_role ?? "Unknown",
         skills: c?.skills ?? [],
         experienceYears: c?.experience_years ?? 0,
@@ -255,7 +252,6 @@ router.get("/shortlist", requireAuth, async (req, res) => {
         connectionId: conn?.id ?? null,
       };
     });
-    const items = await Promise.all(itemsPromises);
     res.json(items);
   } catch (err) {
     res.status(500).json({ error: "db_error", message: err.message });
@@ -269,9 +265,9 @@ router.post("/connect/:maskedId", requireAuth, async (req, res) => {
     const { maskedId } = req.params;
     const { message } = req.body;
     const recruiterId = req.user.id;
-    const realId = await unMaskId(maskedId);
+    const realId = maskedId; // Masking bypassed
 
-    console.log(`[Connect] From Recruiter ${recruiterId} to Masked ${maskedId} (Real: ${realId})`);
+    console.log(`[Connect] From Recruiter ${recruiterId} to ${maskedId}`);
 
     if (!realId) return res.status(404).json({ error: "not_found", message: "Candidate alias not found" });
 
@@ -331,7 +327,7 @@ router.get("/connections", requireAuth, async (req, res) => {
 
     return {
       connectionId: c.id,
-      maskedId: c.masked_id,
+      maskedId: c.candidate_id, // Expose actual ID
       // Only reveal real ID if the candidate is in the shortlist
       realCandidateId: isShortlisted ? c.candidate_id : null,
       status: c.status,
