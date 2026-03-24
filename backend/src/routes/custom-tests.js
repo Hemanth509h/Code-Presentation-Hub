@@ -290,22 +290,26 @@ router.post("/:testId/submit", async (req, res) => {
     if (updateError) throw updateError;
 
     // 2. Automate Shortlist addition for the recruiter who created this test
-    try {
-      const { data: testInfo } = await supabase
-        .from("custom_tests")
-        .select("created_by")
-        .eq("custom_test_id", testId)
-        .single();
-      
-      if (testInfo && testInfo.created_by) {
-        const recruiterId = testInfo.created_by;
-        await supabase
-          .from("recruiter_shortlists")
-          .upsert({ recruiter_id: recruiterId, candidate_id: candidateId }, { onConflict: "recruiter_id, candidate_id", ignoreDuplicates: true });
-        console.log(`[AutoShortlist] Added candidate ${candidateId} to recruiter ${recruiterId} shortlist after test completion.`);
+    if (passed) {
+      try {
+        const { data: testInfo } = await supabase
+          .from("custom_tests")
+          .select("created_by")
+          .eq("custom_test_id", testId)
+          .single();
+        
+        if (testInfo && testInfo.created_by) {
+          const recruiterId = testInfo.created_by;
+          await supabase
+            .from("recruiter_shortlists")
+            .upsert({ recruiter_id: recruiterId, candidate_id: candidateId }, { onConflict: "recruiter_id, candidate_id", ignoreDuplicates: true });
+          console.log(`[AutoShortlist] Added candidate ${candidateId} to recruiter ${recruiterId} shortlist after PASSING test.`);
+        }
+      } catch (err) {
+        console.error("[AutoShortlist] Failed to update shortlist:", err);
       }
-    } catch (err) {
-      console.error("[AutoShortlist] Failed to update shortlist:", err);
+    } else {
+      console.log(`[AutoShortlist] Candidate ${candidateId} did not pass the test (${percentage}%). Not shortlisting.`);
     }
 
     let feedback = "";

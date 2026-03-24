@@ -249,7 +249,7 @@ function ConnectionsTab({ connections, loading, recruiterId }) {
                 </div>
                 
                 <div className="flex items-center gap-2">
-                  {c.status === "accepted" && c.customTestId && (
+                  {c.status === "accepted" && c.realCandidateId && c.customTestId && (
                     <button
                       onClick={() => setActiveChat({ testId: c.customTestId, candidateId: c.realCandidateId })}
                       className="px-3 py-1 rounded-lg border border-primary/20 text-primary text-xs font-semibold hover:bg-primary/5 transition-colors flex items-center gap-1.5"

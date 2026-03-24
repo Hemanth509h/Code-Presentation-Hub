@@ -15,39 +15,42 @@ async function getShortlist(recruiterId) {
 
 async function maskId(id) {
   try {
-    // Check if alias exists
-    const { data: existing, error: sError } = await supabase
+    const { data: existing } = await supabase
       .from("candidate_aliases")
       .select("alias")
       .eq("candidate_id", id)
       .maybeSingle();
 
-    if (sError) console.error("[MaskId] Select error:", sError);
     if (existing) return existing.alias;
 
-    // Create new alias
-    const { count, error: cError } = await supabase
+    // Try to create a sequential alias
+    const { count } = await supabase
       .from("candidate_aliases")
       .select("*", { count: "exact", head: true });
 
-    if (cError) console.error("[MaskId] Count error:", cError);
     const alias = `CAND-${String((count || 0) + 1).padStart(3, '0')}`;
-
-    console.log(`[MaskId] Creating new alias ${alias} for ${id}`);
-
+    
     const { data: created, error: iError } = await supabase
       .from("candidate_aliases")
       .insert({ candidate_id: id, alias })
       .select("alias")
-      .single();
+      .maybeSingle();
 
-    if (iError) console.error("[MaskId] Insert error:", iError);
-    if (created) console.log(`[MaskId] Successfully created alias ${created.alias}`);
+    if (iError || !created) {
+      // Fallback to random alias if collision or error
+      const randomAlias = `CAND-${Math.floor(Math.random() * 900 + 100)}`;
+      const { data: fallback } = await supabase
+        .from("candidate_aliases")
+        .upsert({ candidate_id: id, alias: randomAlias }, { onConflict: "candidate_id" })
+        .select("alias")
+        .single();
+      return fallback?.alias || randomAlias;
+    }
 
-    return created?.alias || alias;
+    return created.alias;
   } catch (err) {
     console.error("[MaskId] Unexpected error:", err);
-    return id; // Fallback to real ID
+    return id; 
   }
 }
 
