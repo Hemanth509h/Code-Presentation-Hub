@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { pool } from "@workspace/db";
+import { pool } from "../lib/db.js";
 
 const router = Router();
 
@@ -21,7 +21,6 @@ router.get("/results", async (req, res) => {
     `;
     const { rows } = await pool.query(query);
 
-    // Anonymize candidate IDs
     const candidateMap = new Map();
     let currentCandidateIndex = 1;
 
@@ -29,10 +28,9 @@ router.get("/results", async (req, res) => {
       if (!candidateMap.has(row.candidate_id)) {
         candidateMap.set(row.candidate_id, `Candidate ${currentCandidateIndex++}`);
       }
-      
       return {
         ...row,
-        candidate_id: candidateMap.get(row.candidate_id) // Overwrite with anonymized ID
+        candidate_id: candidateMap.get(row.candidate_id),
       };
     });
 

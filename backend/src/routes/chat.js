@@ -1,12 +1,11 @@
 import { Router } from "express";
 import { supabase } from "../lib/supabase.js";
+import { pool } from "../lib/db.js";
 
 const router = Router();
 
-// Fetch conversation history for a specific room (test-candidate pair)
 router.get("/init", async (req, res) => {
   try {
-    const { pool } = await import("@workspace/db");
     const initSql = `
       CREATE TABLE IF NOT EXISTS chat_messages (
         id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -17,10 +16,6 @@ router.get("/init", async (req, res) => {
         message text NOT NULL,
         created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
       );
-      ALTER TABLE chat_messages ENABLE ROW LEVEL SECURITY;
-      DROP POLICY IF EXISTS "Service Role Full Access on Chat" ON chat_messages;
-      CREATE POLICY "Service Role Full Access on Chat" ON chat_messages
-        FOR ALL TO service_role USING (true) WITH CHECK (true);
     `;
     await pool.query(initSql);
     res.json({ success: true, message: "Chat table initialized via API." });
@@ -43,15 +38,13 @@ router.get("/:customTestId/:candidateId", async (req, res) => {
     if (error) throw error;
     res.json(messages || []);
   } catch (err) {
-    // Graceful fallback if table doesn't exist yet, instead of throwing 500 continuously on polling
     if (err.message?.includes("does not exist")) {
-      return res.json([]); 
+      return res.json([]);
     }
     res.status(500).json({ error: "db_error", message: err.message });
   }
 });
 
-// Dispatch a new message
 router.post("/", async (req, res) => {
   const { customTestId, candidateId, senderRole, senderId, message } = req.body;
 

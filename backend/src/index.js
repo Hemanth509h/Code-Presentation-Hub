@@ -1,5 +1,5 @@
 import app from "./app.js";
-import { pool } from "@workspace/db";
+import { pool } from "./lib/db.js";
 
 const rawPort = process.env["PORT"] || "8080";
 
