@@ -1,38 +1,36 @@
 import { Router } from "express";
 import { supabase } from "../lib/supabase.js";
 import { requireAuth } from "../middleware/auth.js";
+import { loadData, saveData } from "../utils/storage.js";
 
 const router = Router();
 
-// ─── In-memory stores (prototype) ────────────────────────────────────────────
-// shortlistStore: Map<recruiterId, Set<candidateId>>
-const shortlistStore = new Map();
-// connectionStore: Map<connectionId, { recruiterId, candidateId, status, createdAt }>
-const connectionStore = new Map();
-let connectionCounter = 1;
+// ─── Persistence Layer ────────────────────────────────────────────────────────
+let db = await loadData();
+
+function sync() {
+  saveData(db).catch(err => console.error("Sync error:", err));
+}
 
 function getShortlist(recruiterId) {
-  if (!shortlistStore.has(recruiterId)) shortlistStore.set(recruiterId, new Set());
-  return shortlistStore.get(recruiterId);
+  if (!db.shortlists[recruiterId]) db.shortlists[recruiterId] = [];
+  return db.shortlists[recruiterId];
 }
 
 function maskId(id) {
-  // Deterministic alias so the same real ID always maps to the same mask within a session
-  if (!maskId._map) maskId._map = new Map();
-  if (!maskId._counter) maskId._counter = 0;
-  if (!maskId._map.has(id)) {
+  if (!db.masks[id]) {
     const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-    const idx = maskId._counter++;
+    const idx = db.maskCounter++;
     const alias = idx < 26 ? `Candidate ${letters[idx]}` : `Candidate ${idx + 1}`;
-    maskId._map.set(id, alias);
-    maskId._revMap = maskId._revMap || new Map();
-    maskId._revMap.set(alias, id);
+    db.masks[id] = alias;
+    db.revMasks[alias] = id;
+    sync();
   }
-  return maskId._map.get(id);
+  return db.masks[id];
 }
 
 function unMaskId(alias) {
-  return maskId._revMap?.get(alias) ?? null;
+  return db.revMasks[alias] ?? null;
 }
 
 // ─── Rankings (existing, untouched) ──────────────────────────────────────────
@@ -136,7 +134,7 @@ router.get("/blind-pool", requireAuth, async (req, res) => {
 
     const pool = (candidates ?? []).map((c, idx) => {
       const masked = maskId(c.candidate_id);
-      const conn = myConnections.find(con => con.candidateId === c.candidate_id);
+      const conn = Object.values(db.connections).find(con => con.candidateId === c.candidate_id && con.recruiterId === recruiterId);
       return {
         rank: idx + 1,
         maskedId: masked,
@@ -144,7 +142,7 @@ router.get("/blind-pool", requireAuth, async (req, res) => {
         skills: c.skills,
         experienceYears: c.experience_years,
         overallScore: c.overall_score ?? 0,
-        isShortlisted: shortlist.has(masked),
+        isShortlisted: shortlist.includes(masked),
         connectionStatus: conn?.status ?? null,
         connectionId: conn?.id ?? null,
       };
@@ -156,19 +154,26 @@ router.get("/blind-pool", requireAuth, async (req, res) => {
   }
 });
 
-// ─── Shortlist ────────────────────────────────────────────────────────────────
 router.post("/shortlist/:maskedId", requireAuth, (req, res) => {
   const { maskedId } = req.params;
   const recruiterId = req.user.id;
   const shortlist = getShortlist(recruiterId);
-  shortlist.add(maskedId);
+  if (!shortlist.includes(maskedId)) {
+    shortlist.push(maskedId);
+    sync();
+  }
   res.json({ success: true, maskedId, shortlisted: true });
 });
 
 router.delete("/shortlist/:maskedId", requireAuth, (req, res) => {
   const { maskedId } = req.params;
   const recruiterId = req.user.id;
-  getShortlist(recruiterId).delete(maskedId);
+  const shortlist = getShortlist(recruiterId);
+  const idx = shortlist.indexOf(maskedId);
+  if (idx !== -1) {
+    shortlist.splice(idx, 1);
+    sync();
+  }
   res.json({ success: true, maskedId, shortlisted: false });
 });
 
@@ -183,7 +188,7 @@ router.get("/shortlist", requireAuth, async (req, res) => {
     const items = shortlistedMasked.map(masked => {
       const realId = unMaskId(masked);
       const c = (allCandidates ?? []).find(x => x.candidate_id === realId);
-      const conn = myConnections.find(con => con.candidateId === realId);
+      const conn = Object.values(db.connections).find(con => con.candidateId === realId && con.recruiterId === recruiterId);
       return {
         maskedId: masked,
         targetRole: c?.target_role ?? "Unknown",
@@ -210,13 +215,13 @@ router.post("/connect/:maskedId", requireAuth, (req, res) => {
   if (!realId) return res.status(404).json({ error: "not_found", message: "Candidate alias not found" });
 
   // Check for existing connection
-  const existing = [...connectionStore.values()].find(
+  const existing = Object.values(db.connections).find(
     c => c.recruiterId === recruiterId && c.candidateId === realId
   );
   if (existing) return res.status(409).json({ error: "conflict", message: "Interest already sent" });
 
-  const id = `CONN-${connectionCounter++}`;
-  connectionStore.set(id, {
+  const id = `CONN-${db.connectionCounter++}`;
+  db.connections[id] = {
     id,
     recruiterId,
     candidateId: realId,
@@ -224,14 +229,15 @@ router.post("/connect/:maskedId", requireAuth, (req, res) => {
     message: message || "",
     status: "pending",
     createdAt: new Date().toISOString(),
-  });
+  };
+  sync();
 
   res.status(201).json({ success: true, connectionId: id });
 });
 
 router.get("/connections", requireAuth, (req, res) => {
   const recruiterId = req.user.id;
-  const myConns = [...connectionStore.values()].filter(c => c.recruiterId === recruiterId);
+  const myConns = Object.values(db.connections).filter(c => c.recruiterId === recruiterId);
 
   const result = myConns.map(c => ({
     connectionId: c.id,
@@ -249,11 +255,11 @@ router.get("/connections", requireAuth, (req, res) => {
 // ─── Candidate: view pending requests ────────────────────────────────────────
 router.get("/pending-for-candidate/:candidateId", (req, res) => {
   const { candidateId } = req.params;
-  const pending = [...connectionStore.values()]
+  const pending = Object.values(db.connections)
     .filter(c => c.candidateId === candidateId)
     .map(c => ({
       connectionId: c.id,
-      recruiterAlias: `Recruiter ${c.recruiterId.slice(0, 6)}`,
+      recruiterAlias: `Recruiter ${c.recruiterId.substring(0, 6)}`,
       message: c.message,
       status: c.status,
       createdAt: c.createdAt,
@@ -265,14 +271,14 @@ router.post("/respond/:connectionId", (req, res) => {
   const { connectionId } = req.params;
   const { decision } = req.body; // "accepted" | "declined"
 
-  const conn = connectionStore.get(connectionId);
+  const conn = db.connections[connectionId];
   if (!conn) return res.status(404).json({ error: "not_found" });
   if (!["accepted", "declined"].includes(decision)) {
     return res.status(400).json({ error: "Invalid decision. Use 'accepted' or 'declined'." });
   }
 
   conn.status = decision;
-  connectionStore.set(connectionId, conn);
+  sync();
   res.json({ success: true, connectionId, status: decision });
 });
 
