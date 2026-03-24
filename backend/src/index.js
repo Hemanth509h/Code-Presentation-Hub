@@ -1,4 +1,5 @@
 import app from "./app.js";
+import { initStorage } from "./utils/storage.js";
 
 const rawPort = process.env["PORT"] || "8080";
 
@@ -11,6 +12,8 @@ const port = Number(rawPort);
 if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
+
+await initStorage();
 
 app.listen(port, () => {
   console.log(`Server listening on port ${port}`);

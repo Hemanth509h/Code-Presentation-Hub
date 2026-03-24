@@ -6,8 +6,6 @@ import { db, initStorage, sync } from "../utils/storage.js";
 const router = Router();
 
 // ─── Persistence Layer ────────────────────────────────────────────────────────
-// Initialize storage on load
-initStorage();
 
 function getShortlist(recruiterId) {
   if (!db.shortlists[recruiterId]) db.shortlists[recruiterId] = [];
@@ -185,7 +183,7 @@ router.get("/shortlist", requireAuth, async (req, res) => {
     const shortlistedMasked = [...getShortlist(recruiterId)];
     // Enrich with live data (still masked)
     const { data: allCandidates } = await supabase.from("candidates").select("*");
-    const myConnections = [...connectionStore.values()].filter(c => c.recruiterId === recruiterId);
+    const myConnections = Object.values(db.connections).filter(c => c.recruiterId === recruiterId);
 
     const items = shortlistedMasked.map(masked => {
       const realId = unMaskId(masked);
@@ -208,7 +206,7 @@ router.get("/shortlist", requireAuth, async (req, res) => {
 });
 
 // ─── Connections ──────────────────────────────────────────────────────────────
-router.post("/connect/:maskedId", requireAuth, (req, res) => {
+router.post("/connect/:maskedId", requireAuth, async (req, res) => {
   const { maskedId } = req.params;
   const { message } = req.body;
   const recruiterId = req.user.id;
@@ -232,7 +230,7 @@ router.post("/connect/:maskedId", requireAuth, (req, res) => {
     status: "pending",
     createdAt: new Date().toISOString(),
   };
-  sync();
+  await sync();
 
   res.status(201).json({ success: true, connectionId: id });
 });

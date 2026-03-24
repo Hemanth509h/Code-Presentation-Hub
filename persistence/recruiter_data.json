@@ -1,1 +1,26 @@
-﻿{}
+{
+  "shortlists": {
+    "e476cfd7-6ed6-4d58-b17c-9a4c1e98ceca": [
+      "CND-8068"
+    ]
+  },
+  "connections": {},
+  "masks": {
+    "CND-7932": "CAND-001",
+    "CND-8068": "CAND-002",
+    "CND-5693": "CAND-003",
+    "CND-9096": "CAND-004",
+    "CND-4388": "CAND-005",
+    "CND-6243": "CAND-006"
+  },
+  "revMasks": {
+    "CAND-001": "CND-7932",
+    "CAND-002": "CND-8068",
+    "CAND-003": "CND-5693",
+    "CAND-004": "CND-9096",
+    "CAND-005": "CND-4388",
+    "CAND-006": "CND-6243"
+  },
+  "connectionCounter": 1,
+  "maskCounter": 6
+}

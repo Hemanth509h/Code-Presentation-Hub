@@ -4,9 +4,6 @@ import { db, sync, initStorage } from "../utils/storage.js";
 import { requireAuth } from "../middleware/auth.js";
 import { randomUUID } from "crypto";
 
-// Initialize storage on load
-initStorage();
-
 const router = Router();
 
 router.post("/", requireAuth, async (req, res) => {
