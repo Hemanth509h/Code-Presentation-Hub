@@ -28,6 +28,7 @@ export async function initStorage() {
   await ensureStorage();
   try {
     const content = await fs.readFile(STORAGE_FILE, "utf-8");
+    if (!content.trim()) return; // Handle empty file
     const data = JSON.parse(content);
     Object.assign(db, data);
     console.log("[Storage] Data loaded successfully");

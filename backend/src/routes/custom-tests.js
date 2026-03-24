@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { supabase } from "../lib/supabase.js";
-import { db, sync } from "../utils/storage.js";
+import { db, sync, initStorage } from "../utils/storage.js";
 import { requireAuth } from "../middleware/auth.js";
 import { randomUUID } from "crypto";
 
