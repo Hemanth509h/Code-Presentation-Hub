@@ -5,6 +5,9 @@ import {
   Clock, Eye, EyeOff, Star, Shield, Briefcase, ChevronDown, ChevronUp, X,
 } from "lucide-react";
 import { Card, CardContent } from "@/shared/components/ui-elements";
+import { ChatBox } from "@/shared/components/chat-box";
+import { useAppStore } from "@/store/use-app-store";
+import { MessageSquare } from "lucide-react";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 const scoreColor = (s) => s >= 80 ? "text-emerald-600" : s >= 60 ? "text-yellow-600" : "text-red-500";
@@ -205,7 +208,8 @@ function ShortlistTab({ items, loading, onShortlist, onConnect }) {
 }
 
 // ── Connections Tab ───────────────────────────────────────────────────────────
-function ConnectionsTab({ connections, loading }) {
+function ConnectionsTab({ connections, loading, recruiterId }) {
+  const [activeChat, setActiveChat] = useState(null); // { testId, candidateId }
   if (loading) return <div className="flex justify-center py-16"><div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary" /></div>;
 
   if (connections.length === 0) return (
@@ -243,21 +247,45 @@ function ConnectionsTab({ connections, loading }) {
                   </span>
                   {c.message && <p className="text-sm text-muted-foreground mt-0.5 italic">"{c.message}"</p>}
                 </div>
-                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-semibold ${s.cls}`}>
-                  <Icon className="w-3.5 h-3.5" /> {s.label}
-                </span>
+                
+                <div className="flex items-center gap-2">
+                  {c.status === "accepted" && c.customTestId && (
+                    <button
+                      onClick={() => setActiveChat({ testId: c.customTestId, candidateId: c.realCandidateId })}
+                      className="px-3 py-1 rounded-lg border border-primary/20 text-primary text-xs font-semibold hover:bg-primary/5 transition-colors flex items-center gap-1.5"
+                    >
+                      <MessageSquare className="w-3.5 h-3.5" /> Chat
+                    </button>
+                  )}
+                  <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-semibold ${s.cls}`}>
+                    <Icon className="w-3.5 h-3.5" /> {s.label}
+                  </span>
+                </div>
               </div>
               <p className="text-xs text-muted-foreground mt-2">Sent {new Date(c.createdAt).toLocaleDateString()}</p>
             </div>
           </div>
         );
       })}
+
+      {activeChat && (
+        <ChatBox
+          customTestId={activeChat.testId}
+          candidateId={activeChat.candidateId}
+          role="recruiter"
+          senderId={recruiterId}
+          defaultOpen={true}
+          onClose={() => setActiveChat(null)}
+        />
+      )}
     </div>
   );
 }
 
 // ── Main Component ────────────────────────────────────────────────────────────
 export function BlindRecruitmentTab() {
+  const { user } = useAppStore();
+  const recruiterId = user?.id;
   const [subTab, setSubTab] = useState("discover");
   const [pool, setPool] = useState([]);
   const [shortlist, setShortlist] = useState([]);
@@ -382,7 +410,7 @@ export function BlindRecruitmentTab() {
             <ShortlistTab items={shortlist} loading={loadingShortlist} onShortlist={handleShortlist} onConnect={handleConnect} />
           )}
           {subTab === "connections" && (
-            <ConnectionsTab connections={connections} loading={loadingConns} />
+            <ConnectionsTab connections={connections} loading={loadingConns} recruiterId={recruiterId} />
           )}
         </motion.div>
       </AnimatePresence>

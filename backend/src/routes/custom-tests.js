@@ -1,7 +1,11 @@
 import { Router } from "express";
 import { supabase } from "../lib/supabase.js";
+import { db, sync } from "../utils/storage.js";
 import { requireAuth } from "../middleware/auth.js";
 import { randomUUID } from "crypto";
+
+// Initialize storage on load
+initStorage();
 
 const router = Router();
 
@@ -288,6 +292,27 @@ router.post("/:testId/submit", async (req, res) => {
       .eq("custom_test_id", testId)
       .eq("candidate_id", candidateId);
     if (updateError) throw updateError;
+
+    // 2. Automate Shortlist addition for the recruiter who created this test
+    try {
+      const { data: testInfo } = await supabase
+        .from("custom_tests")
+        .select("created_by")
+        .eq("custom_test_id", testId)
+        .single();
+      
+      if (testInfo && testInfo.created_by) {
+        const recruiterId = testInfo.created_by;
+        if (!db.shortlists[recruiterId]) db.shortlists[recruiterId] = [];
+        if (!db.shortlists[recruiterId].includes(candidateId)) {
+          db.shortlists[recruiterId].push(candidateId);
+          sync();
+          console.log(`[AutoShortlist] Added candidate ${candidateId} to recruiter ${recruiterId} shortlist after test completion.`);
+        }
+      }
+    } catch (err) {
+      console.error("[AutoShortlist] Failed to update shortlist:", err);
+    }
 
     let feedback = "";
     if (percentage >= 90) feedback = "Outstanding! You demonstrated exceptional mastery.";

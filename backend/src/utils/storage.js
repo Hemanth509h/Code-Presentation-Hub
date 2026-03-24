@@ -15,28 +15,31 @@ export async function ensureStorage() {
   }
 }
 
-export async function loadData() {
+export const db = {
+  shortlists: {},
+  connections: {},
+  masks: {},
+  revMasks: {},
+  connectionCounter: 1,
+  maskCounter: 0,
+};
+
+export async function initStorage() {
   await ensureStorage();
   try {
     const content = await fs.readFile(STORAGE_FILE, "utf-8");
-    return JSON.parse(content);
+    const data = JSON.parse(content);
+    Object.assign(db, data);
+    console.log("[Storage] Data loaded successfully");
   } catch (err) {
-    // If file doesn't exist, return default structure
-    return {
-      shortlists: {}, // recruiterId -> array of maskedIds
-      connections: {}, // connectionId -> connection data
-      masks: {}, // candidateId -> alias
-      revMasks: {}, // alias -> candidateId
-      connectionCounter: 1,
-      maskCounter: 0,
-    };
+    console.log("[Storage] No existing data found, using defaults");
   }
 }
 
-export async function saveData(data) {
+export async function sync() {
   await ensureStorage();
   try {
-    await fs.writeFile(STORAGE_FILE, JSON.stringify(data, null, 2), "utf-8");
+    await fs.writeFile(STORAGE_FILE, JSON.stringify(db, null, 2), "utf-8");
   } catch (err) {
     console.error("Failed to save recruiter data:", err);
   }

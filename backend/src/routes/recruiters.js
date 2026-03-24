@@ -1,16 +1,13 @@
 import { Router } from "express";
 import { supabase } from "../lib/supabase.js";
 import { requireAuth } from "../middleware/auth.js";
-import { loadData, saveData } from "../utils/storage.js";
+import { db, initStorage, sync } from "../utils/storage.js";
 
 const router = Router();
 
 // ─── Persistence Layer ────────────────────────────────────────────────────────
-let db = await loadData();
-
-function sync() {
-  saveData(db).catch(err => console.error("Sync error:", err));
-}
+// Initialize storage on load
+initStorage();
 
 function getShortlist(recruiterId) {
   if (!db.shortlists[recruiterId]) db.shortlists[recruiterId] = [];
@@ -18,13 +15,15 @@ function getShortlist(recruiterId) {
 }
 
 function maskId(id) {
-  // We now use the real candidate_id as the "alias" per user request
-  if (!db.masks[id]) {
-    db.masks[id] = id;
-    db.revMasks[id] = id;
-    sync();
-  }
-  return db.masks[id];
+  if (db.masks[id]) return db.masks[id];
+  
+  db.maskCounter = (db.maskCounter || 0) + 1;
+  const alias = `CAND-${String(db.maskCounter).padStart(3, '0')}`;
+  
+  db.masks[id] = alias;
+  db.revMasks[alias] = id;
+  sync();
+  return alias;
 }
 
 function unMaskId(alias) {
@@ -238,19 +237,30 @@ router.post("/connect/:maskedId", requireAuth, (req, res) => {
   res.status(201).json({ success: true, connectionId: id });
 });
 
-router.get("/connections", requireAuth, (req, res) => {
+router.get("/connections", requireAuth, async (req, res) => {
   const recruiterId = req.user.id;
   const myConns = Object.values(db.connections).filter(c => c.recruiterId === recruiterId);
 
-  const result = myConns.map(c => ({
-    connectionId: c.id,
-    maskedId: c.maskedId,
-    // Only reveal real ID on acceptance
-    realCandidateId: c.status === "accepted" ? c.candidateId : null,
-    status: c.status,
-    message: c.message,
-    createdAt: c.createdAt,
-  }));
+  // For accepted connections, try to find the assigned custom test
+  const { data: assignments } = await supabase
+    .from("custom_test_assignments")
+    .select("custom_test_id, candidate_id");
+
+  const result = myConns.map(c => {
+    const assignment = (assignments || []).find(a => a.candidate_id === c.candidateId);
+    const isShortlisted = db.shortlists[recruiterId]?.includes(c.candidateId);
+    
+    return {
+      connectionId: c.id,
+      maskedId: c.maskedId,
+      // Only reveal real ID if the candidate is in the shortlist
+      realCandidateId: isShortlisted ? c.candidateId : null,
+      status: c.status,
+      message: c.message,
+      createdAt: c.createdAt,
+      customTestId: assignment?.custom_test_id || null, 
+    };
+  });
 
   res.json(result);
 });
@@ -270,7 +280,7 @@ router.get("/pending-for-candidate/:candidateId", (req, res) => {
   res.json(pending);
 });
 
-router.post("/respond/:connectionId", (req, res) => {
+router.post("/respond/:connectionId", async (req, res) => {
   const { connectionId } = req.params;
   const { decision } = req.body; // "accepted" | "declined"
 
@@ -281,6 +291,51 @@ router.post("/respond/:connectionId", (req, res) => {
   }
 
   conn.status = decision;
+
+  // Automated actions on acceptance
+  if (decision === "accepted") {
+    const { recruiterId, candidateId } = conn;
+    
+    // 1. Assign the most recent custom test from this recruiter
+    try {
+      const { data: tests } = await supabase
+        .from("custom_tests")
+        .select("custom_test_id")
+        .eq("created_by", recruiterId)
+        .order("created_at", { ascending: false })
+        .limit(1);
+
+      if (tests && tests.length > 0) {
+        const testId = tests[0].custom_test_id;
+        await supabase
+          .from("custom_test_assignments")
+          .upsert({ 
+            custom_test_id: testId, 
+            candidate_id: candidateId 
+          }, { onConflict: "custom_test_id, candidate_id", ignoreDuplicates: true });
+        console.log(`[AutoAssign] Assigned test ${testId} to candidate ${candidateId}`);
+
+        // 3. Send automated welcome message via chat
+        try {
+          await supabase
+            .from("chat_messages")
+            .insert({
+              custom_test_id: testId,
+              candidate_id: candidateId,
+              sender_role: "recruiter",
+              sender_id: recruiterId,
+              message: `Hello! I've accepted your interest and assigned a custom test: "${tests[0].title}". You can find it in your dashboard. Good luck!`,
+            });
+        } catch (chatErr) {
+          console.error("[AutoAssign] Failed to send welcome message:", chatErr);
+        }
+      }
+    } catch (err) {
+      console.error("[AutoAssign] Failed to assign custom test:", err);
+      // We don't fail the response if test assignment fails, as it's a side effect
+    }
+  }
+
   sync();
   res.json({ success: true, connectionId, status: decision });
 });

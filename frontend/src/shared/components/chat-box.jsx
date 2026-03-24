@@ -22,7 +22,7 @@ export function ChatBox({ customTestId, candidateId, role, senderId, defaultOpen
         console.error("Failed to fetch chat logs", err);
       }
     };
-    
+
     fetchMessages();
     const interval = setInterval(fetchMessages, 3000);
     return () => clearInterval(interval);
@@ -81,7 +81,7 @@ export function ChatBox({ customTestId, candidateId, role, senderId, defaultOpen
 
   return (
     <Card className={`fixed right-6 z-50 shadow-2xl transition-all duration-300 flex flex-col ${isMinimized ? "bottom-6 h-14 w-72" : "bottom-6 h-[450px] w-80 sm:w-96"}`}>
-      <div 
+      <div
         className="bg-primary text-white p-3 rounded-t-xl flex justify-between items-center cursor-pointer"
         onClick={() => setIsMinimized(!isMinimized)}
       >
@@ -93,7 +93,7 @@ export function ChatBox({ customTestId, candidateId, role, senderId, defaultOpen
           <button onClick={(e) => { e.stopPropagation(); setIsMinimized(!isMinimized); }} className="hover:text-white transition-colors">
             {isMinimized ? <Maximize2 className="w-4 h-4" /> : <Minimize2 className="w-4 h-4" />}
           </button>
-          <button onClick={(e) => { e.stopPropagation(); setIsOpen(false); if(onClose) onClose(); }} className="hover:text-white transition-colors">
+          <button onClick={(e) => { e.stopPropagation(); setIsOpen(false); if (onClose) onClose(); }} className="hover:text-white transition-colors">
             <X className="w-4 h-4" />
           </button>
         </div>

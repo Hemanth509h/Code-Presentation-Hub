@@ -43,6 +43,7 @@ const TYPE_COLOR = {
 function AssignedTestsSection({ candidateId }) {
   const [tests, setTests] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [activeChat, setActiveChat] = useState(null); // { testId, title }
   const [_, setLocation] = useLocation();
 
   useEffect(() => {
@@ -119,25 +120,40 @@ function AssignedTestsSection({ candidateId }) {
                     </div>
                   </div>
 
-                  {done ? (
-                    <div className="bg-secondary/50 rounded-xl p-4 text-center">
-                      <p className="text-2xl font-bold font-mono text-primary">{test.percentage}%</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">Completed</p>
-                    </div>
-                  ) : (
+                  <div className="flex gap-2 mt-auto">
                     <Button
-                      className="w-full mt-auto"
-                      onClick={() => setLocation(`/custom-test/${test.customTestId}`)}
+                      variant="outline"
+                      className="flex-1 gap-2"
+                      onClick={() => setActiveChat({ testId: test.customTestId, title: test.title })}
                     >
-                      Start Test
+                      <MessageSquare className="w-4 h-4" /> Chat
                     </Button>
-                  )}
+                    {!done && (
+                      <Button
+                        className="flex-[2]"
+                        onClick={() => setLocation(`/custom-test/${test.customTestId}`)}
+                      >
+                        Start Test
+                      </Button>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
             </motion.div>
           );
         })}
       </div>
+
+      {activeChat && (
+        <ChatBox
+          customTestId={activeChat.testId}
+          candidateId={candidateId}
+          role="candidate"
+          senderId={candidateId}
+          defaultOpen={true}
+          onClose={() => setActiveChat(null)}
+        />
+      )}
     </div>
   );
 }
