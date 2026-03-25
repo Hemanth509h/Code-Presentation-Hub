@@ -131,9 +131,22 @@ function AuthListener() {
 
   useEffect(() => {
     fetch("/api/auth/me", { credentials: "include" })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((user) => setUser(user))
-      .catch(() => setUser(null));
+      .then(async (res) => {
+        if (res.ok) {
+          const user = await res.json();
+          setUser(user);
+        } else if (res.status === 401) {
+          // Confirmed: session is gone — log out
+          setUser(null);
+        } else {
+          // Server error / network blip — don't log out, just mark loading done
+          setUser(useAppStore.getState().user ?? null);
+        }
+      })
+      .catch(() => {
+        // Network failure (offline, server restarting) — keep existing session
+        setUser(useAppStore.getState().user ?? null);
+      });
   }, [setUser]);
 
   return null;

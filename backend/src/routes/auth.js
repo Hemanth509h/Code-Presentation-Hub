@@ -5,11 +5,12 @@ import { supabase } from "../lib/supabase.js";
 const router = Router();
 
 const COOKIE_NAME = "sb_access_token";
+const REFRESH_COOKIE_NAME = "sb_refresh_token";
 const COOKIE_OPTS = {
   httpOnly: true,
   sameSite: "lax",
   secure: process.env.NODE_ENV === "production",
-  maxAge: 60 * 60 * 24 * 7 * 1000,
+  maxAge: 60 * 60 * 24 * 7 * 1000, // 7 days
 };
 
 router.post("/login", async (req, res) => {
@@ -24,6 +25,7 @@ router.post("/login", async (req, res) => {
   }
 
   res.cookie(COOKIE_NAME, data.session.access_token, COOKIE_OPTS);
+  res.cookie(REFRESH_COOKIE_NAME, data.session.refresh_token, COOKIE_OPTS);
 
   const user = data.user;
   res.json({
@@ -63,29 +65,59 @@ router.post("/logout", async (req, res) => {
     await supabaseAnon.auth.signOut();
   }
   res.clearCookie(COOKIE_NAME, { httpOnly: true, sameSite: "lax" });
+  res.clearCookie(REFRESH_COOKIE_NAME, { httpOnly: true, sameSite: "lax" });
   res.json({ success: true });
 });
 
 router.get("/me", async (req, res) => {
   const token = req.cookies[COOKIE_NAME];
-  if (!token) {
+  const refreshToken = req.cookies[REFRESH_COOKIE_NAME];
+
+  if (!token && !refreshToken) {
     return res.status(401).json({ error: "unauthorized", message: "Not authenticated" });
   }
 
-  const { data, error } = await supabase.auth.getUser(token);
-  if (error || !data.user) {
-    res.clearCookie(COOKIE_NAME, { httpOnly: true, sameSite: "lax" });
-    return res.status(401).json({ error: "unauthorized", message: "Invalid or expired session" });
+  // Try access token first
+  if (token) {
+    const { data, error } = await supabase.auth.getUser(token);
+    if (!error && data.user) {
+      const user = data.user;
+      return res.json({
+        id: user.id,
+        email: user.email,
+        role: user.user_metadata?.role || "candidate",
+        name: user.user_metadata?.name || "",
+        candidateId: user.user_metadata?.candidate_id || null,
+      });
+    }
   }
 
-  const user = data.user;
-  res.json({
-    id: user.id,
-    email: user.email,
-    role: user.user_metadata?.role || "candidate",
-    name: user.user_metadata?.name || "",
-    candidateId: user.user_metadata?.candidate_id || null,
-  });
+  // Access token failed — try refreshing with refresh token
+  if (refreshToken) {
+    const { data: refreshData, error: refreshError } = await supabaseAnon.auth.refreshSession({
+      refresh_token: refreshToken,
+    });
+
+    if (!refreshError && refreshData?.session && refreshData?.user) {
+      // Re-set both cookies with the new tokens
+      res.cookie(COOKIE_NAME, refreshData.session.access_token, COOKIE_OPTS);
+      res.cookie(REFRESH_COOKIE_NAME, refreshData.session.refresh_token, COOKIE_OPTS);
+
+      const user = refreshData.user;
+      return res.json({
+        id: user.id,
+        email: user.email,
+        role: user.user_metadata?.role || "candidate",
+        name: user.user_metadata?.name || "",
+        candidateId: user.user_metadata?.candidate_id || null,
+      });
+    }
+  }
+
+  // Both failed — clear cookies and return 401
+  res.clearCookie(COOKIE_NAME, { httpOnly: true, sameSite: "lax" });
+  res.clearCookie(REFRESH_COOKIE_NAME, { httpOnly: true, sameSite: "lax" });
+  return res.status(401).json({ error: "unauthorized", message: "Session expired. Please log in again." });
 });
 
 router.put("/profile", requireAuth, async (req, res) => {
