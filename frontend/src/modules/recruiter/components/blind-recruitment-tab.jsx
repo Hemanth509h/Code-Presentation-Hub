@@ -109,7 +109,7 @@ function CandidateRow({ candidate, onShortlist, onConnect, compact = false }) {
     <div className={`flex items-center gap-4 p-4 rounded-xl border border-border bg-card hover:shadow-sm transition-all ${compact ? "flex-wrap" : ""}`}>
       {/* Rank */}
       <div className={`shrink-0 w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm ${rankNum > 0 && rankNum <= 3 ? "bg-primary/10 text-primary" : "bg-secondary text-muted-foreground"}`}>
-        {rankNum > 0 && rankNum <= 3 ? ["🥇","🥈","🥉"][rankNum - 1] : (rankNum || "—")}
+        {rankNum > 0 && rankNum <= 3 ? ["🥇", "🥈", "🥉"][rankNum - 1] : (rankNum || "—")}
       </div>
 
       {/* Identity & meta */}
@@ -278,7 +278,7 @@ function ConnectionsTab({ connections, loading, recruiterId }) {
                   </span>
                   {c.message && <p className="text-sm text-muted-foreground mt-0.5 italic">"{c.message}"</p>}
                 </div>
-                
+
                 <div className="flex items-center gap-2">
                   {c.status === "accepted" && c.realCandidateId && c.customTestId && (
                     <button
@@ -379,8 +379,8 @@ export function BlindRecruitmentTab() {
 
   const TABS = [
     { id: "discover", label: "Discover", icon: Users, badge: pool.length },
-    { id: "shortlist", label: "Shortlist", icon: Heart, badge: pool.filter(c => c.isShortlisted).length },
     { id: "connections", label: "Connections", icon: Inbox, badge: connections.length },
+    { id: "shortlist", label: "Shortlist", icon: Heart, badge: pool.filter(c => c.isShortlisted).length },
   ];
 
   return (
