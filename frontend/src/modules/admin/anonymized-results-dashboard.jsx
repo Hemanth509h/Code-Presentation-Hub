@@ -319,31 +319,6 @@ export default function AnonymizedResultsDashboard() {
 
       {/* ─── Transparency & Methodology ─── */}
       <div className="grid md:grid-cols-3 gap-6">
-        {/* Transparency Audit Log */}
-        <div className="md:col-span-1 rounded-2xl border border-border bg-card p-5 shadow-sm space-y-4">
-          <div className="flex items-center gap-2">
-            <Fingerprint className="w-5 h-5 text-primary" />
-            <h3 className="font-bold">Transparency Audit</h3>
-          </div>
-          <div className="space-y-3">
-            {[
-              { label: "Selection Parity", status: data?.transparencyAudit?.selectionParity || "PENDING" },
-              { label: "Score Neutrality", status: data?.transparencyAudit?.scoreNeutrality || "PENDING" },
-              { label: "Anonymization Layer", status: data?.transparencyAudit?.anonymizationLayer || "ACTIVE" },
-            ].map((item, i) => (
-              <div key={i} className="flex items-center justify-between text-sm py-2 border-b border-border/50 last:border-0">
-                <span className="text-muted-foreground">{item.label}</span>
-                <span className={`font-mono text-[10px] px-2 py-0.5 rounded-full font-bold ${item.status === 'PASS' || item.status === 'ACTIVE' || item.status === 'VERIFIED' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-                  {item.status}
-                </span>
-              </div>
-            ))}
-          </div>
-          <div className="text-[10px] text-muted-foreground flex items-center justify-between">
-            <span>Last automated audit:</span>
-            <span>{data?.transparencyAudit?.lastAudit ? new Date(data.transparencyAudit.lastAudit).toLocaleTimeString() : "Never"}</span>
-          </div>
-        </div>
 
         {/* Bias Reduction Methodology */}
         <div className="md:col-span-2 rounded-2xl border border-primary/10 bg-gradient-to-br from-primary/5 to-accent/5 p-6 shadow-sm">
