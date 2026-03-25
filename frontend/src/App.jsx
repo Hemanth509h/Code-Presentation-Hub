@@ -65,8 +65,6 @@ function AppRouter() {
         <Switch>
           <Route path="/" component={RecruiterDashboard} />
           <Route path="/recruiter" component={RecruiterDashboard} />
-          <Route path="/fairness" component={AnonymizedResultsDashboard} />
-          <Route path="/anonymized-results" component={AnonymizedResultsDashboard} />
           <Route path="/login" component={() => <Redirect to="/" />} />
           <Route path="/register" component={() => <Redirect to="/" />} />
           <Route component={RecruiterDashboard} />

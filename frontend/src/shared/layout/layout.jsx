@@ -54,7 +54,7 @@ export function Layout({ children }) {
           </Link>
 
           <div className="flex items-center gap-4">
-            {(role === "admin" || role === "recruiter") && (
+            {role === "admin" && (
               <Link href="/fairness" className="text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors hidden sm:flex items-center gap-1.5 px-2">
                 🛡️ Fairness & Rankings
               </Link>

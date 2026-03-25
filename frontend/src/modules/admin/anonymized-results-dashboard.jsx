@@ -202,8 +202,8 @@ export default function AnonymizedResultsDashboard() {
       const matchSearch = c.candidate_id.toLowerCase().includes(search.toLowerCase());
       const matchStatus =
         statusFilter === "all" ? true :
-        statusFilter === "pass" ? c.passRate >= 60 :
-        c.passRate < 60;
+          statusFilter === "pass" ? c.passRate >= 60 :
+            c.passRate < 60;
       return matchSearch && matchStatus;
     });
 
@@ -299,13 +299,7 @@ export default function AnonymizedResultsDashboard() {
             sub="Adverse Impact Ratio (>0.8+)"
             color="bg-blue-100 text-blue-700"
           />
-          <KpiCard
-            icon={Percent}
-            label="Evaluation Consistency"
-            value={fairness?.consistencyIndex ? `${fairness.consistencyIndex}/100` : "0"}
-            sub="Score distribution stability"
-            color="bg-amber-100 text-amber-700"
-          />
+
           <KpiCard
             icon={Percent}
             label="Score Variance"
