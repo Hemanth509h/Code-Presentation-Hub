@@ -1,5 +1,7 @@
+import React, { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useAppStore, getUserRole } from "@/store/use-app-store";
+import { UserProfileModal } from "../components/user-profile-modal";
 import { Button } from "../components/ui-elements";
 import {
   ShieldCheck,
@@ -26,6 +28,7 @@ const ROLE_ICON = {
 export function Layout({ children }) {
   const [_, setLocation] = useLocation();
   const { candidateId, logout, user } = useAppStore();
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const role = getUserRole(user);
   const badge = ROLE_BADGE[role] || ROLE_BADGE.candidate;
 
@@ -67,15 +70,27 @@ export function Layout({ children }) {
             )}
 
             {user ? (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleLogout}
-                className="gap-2 text-muted-foreground"
-              >
-                <LogOut className="w-4 h-4" />
-                <span className="hidden sm:inline">Sign Out</span>
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsProfileModalOpen(true)}
+                  className="gap-2 text-muted-foreground hover:text-primary transition-colors"
+                  title="Profile Settings"
+                >
+                  <UserCircle className="w-5 h-5" />
+                  <span className="hidden sm:inline font-medium">{user.name || "Profile"}</span>
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleLogout}
+                  className="gap-2 text-muted-foreground"
+                >
+                  <LogOut className="w-4 h-4" />
+                  <span className="hidden sm:inline">Sign Out</span>
+                </Button>
+              </div>
             ) : (
               <Link href="/login">
                 <Button variant="outline" size="sm" className="gap-2">
@@ -91,6 +106,7 @@ export function Layout({ children }) {
       <main className="flex-grow w-full flex flex-col relative z-0">
         <AnimatePresence mode="wait">{children}</AnimatePresence>
       </main>
+      <UserProfileModal isOpen={isProfileModalOpen} onClose={() => setIsProfileModalOpen(false)} />
     </div>
   );
 }

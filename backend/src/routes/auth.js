@@ -30,6 +30,7 @@ router.post("/login", async (req, res) => {
     id: user.id,
     email: user.email,
     role: user.user_metadata?.role || "candidate",
+    name: user.user_metadata?.name || "",
   });
 });
 
@@ -81,7 +82,26 @@ router.get("/me", async (req, res) => {
     id: user.id,
     email: user.email,
     role: user.user_metadata?.role || "candidate",
+    name: user.user_metadata?.name || "",
   });
+});
+
+router.put("/profile", requireAuth, async (req, res) => {
+  const { name } = req.body;
+  
+  if (!name) {
+    return res.status(400).json({ error: "missing_fields", message: "Name is required" });
+  }
+
+  const { data, error } = await supabase.auth.admin.updateUserById(req.user.id, {
+    user_metadata: { name }
+  });
+
+  if (error) {
+    return res.status(400).json({ error: "update_error", message: error.message });
+  }
+
+  res.json({ success: true, name: data.user.user_metadata?.name });
 });
 
 export async function requireAuth(req, res, next) {
@@ -98,6 +118,7 @@ export async function requireAuth(req, res, next) {
     id: data.user.id,
     email: data.user.email,
     role: data.user.user_metadata?.role || "candidate",
+    name: data.user.user_metadata?.name || "",
   };
   next();
 }

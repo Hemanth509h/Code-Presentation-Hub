@@ -10,10 +10,14 @@ export function ChatBox({ customTestId, candidateId, role, senderId, defaultOpen
   const scrollRef = useRef(null);
 
   useEffect(() => {
-    // Simple HTTP Polling mechanism for realtime updates 
     const fetchMessages = async () => {
       try {
-        const res = await fetch(`/api/chat/${customTestId}/${candidateId}`);
+        const res = await fetch(`/api/chat/${customTestId}/${candidateId}?t=${Date.now()}`, {
+          cache: "no-store",
+          headers: {
+            "Cache-Control": "no-cache"
+          }
+        });
         if (res.ok) {
           const data = await res.json();
           setMessages(data);

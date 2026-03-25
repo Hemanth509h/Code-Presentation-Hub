@@ -27,6 +27,11 @@ export const useAppStore = create(
         }));
       },
 
+      updateUserMetadata: (metadata) => 
+        set((state) => ({
+          user: state.user ? { ...state.user, ...metadata } : null,
+        })),
+
       logout: async () => {
         try {
           await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
