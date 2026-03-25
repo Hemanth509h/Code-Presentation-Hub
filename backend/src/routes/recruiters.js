@@ -241,7 +241,16 @@ router.get("/shortlist", requireAuth, async (req, res) => {
     const recruiterId = req.user.id;
     const shortlistedIds = await getShortlist(recruiterId);
 
-    const { data: allCandidates } = await supabase.from("candidates").select("*");
+    if (shortlistedIds.length === 0) return res.json([]);
+
+    // Fetch all shortlisted candidates ordered by score (highest first)
+    const { data: allCandidates, error: cErr } = await supabase
+      .from("candidates")
+      .select("*")
+      .in("candidate_id", shortlistedIds)
+      .order("overall_score", { ascending: false });
+    if (cErr) throw cErr;
+
     const { data: conns } = await supabase
       .from("recruiter_connections")
       .select("*")
@@ -250,24 +259,38 @@ router.get("/shortlist", requireAuth, async (req, res) => {
     const { data: usersData } = await supabase.auth.admin.listUsers();
     const users = usersData?.users || [];
 
-    const items = shortlistedIds.map(realId => {
-      const c = (allCandidates ?? []).find(x => x.candidate_id === realId);
+    const items = (allCandidates ?? []).map((c, idx) => {
+      const realId = c.candidate_id;
       const conn = (conns || []).find(con => con.candidate_id === realId);
-      const user = users.find(u => u.user_metadata?.candidate_id === realId);
+
+      // Multi-strategy user matching: metadata field OR email prefix contains candidateId
+      const user = users.find(u =>
+        u.user_metadata?.candidate_id === realId ||
+        u.user_metadata?.candidateId === realId ||
+        (u.email && u.email.toLowerCase().startsWith(realId.toLowerCase()))
+      );
+
+      const realName = user
+        ? (user.user_metadata?.name || user.user_metadata?.full_name || user.email?.split("@")[0] || null)
+        : null;
+
       return {
+        rank: idx + 1,
         maskedId: realId,
-        targetRole: c?.target_role ?? "Unknown",
-        skills: c?.skills ?? [],
-        experienceYears: c?.experience_years ?? 0,
-        overallScore: c?.overall_score ?? 0,
+        targetRole: c.target_role ?? "Unknown",
+        skills: c.skills ?? [],
+        experienceYears: c.experience_years ?? 0,
+        overallScore: c.overall_score ?? 0,
         connectionStatus: conn?.status ?? null,
         connectionId: conn?.id ?? null,
-        realName: user ? user.user_metadata?.name || "Anonymous" : null,
+        isShortlisted: true,
+        realName,
         realEmail: user ? user.email || null : null,
       };
     });
     res.json(items);
   } catch (err) {
+    console.error("[Shortlist GET] Error:", err);
     res.status(500).json({ error: "db_error", message: err.message });
   }
 });

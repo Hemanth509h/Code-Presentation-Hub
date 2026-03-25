@@ -101,31 +101,46 @@ function InterestModal({ candidate, onConfirm, onClose }) {
 
 // ── Candidate Row ─────────────────────────────────────────────────────────────
 function CandidateRow({ candidate, onShortlist, onConnect, compact = false }) {
+  const rankNum = candidate.rank ?? 0;
+  const displayName = candidate.realName || candidate.maskedId || "Unknown Candidate";
+  const isRevealed = !!candidate.realName;
+
   return (
     <div className={`flex items-center gap-4 p-4 rounded-xl border border-border bg-card hover:shadow-sm transition-all ${compact ? "flex-wrap" : ""}`}>
       {/* Rank */}
-      <div className={`shrink-0 w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm ${candidate.rank <= 3 ? "bg-primary/10 text-primary" : "bg-secondary text-muted-foreground"}`}>
-        {candidate.rank <= 3 ? ["🥇","🥈","🥉"][candidate.rank - 1] : candidate.rank}
+      <div className={`shrink-0 w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm ${rankNum > 0 && rankNum <= 3 ? "bg-primary/10 text-primary" : "bg-secondary text-muted-foreground"}`}>
+        {rankNum > 0 && rankNum <= 3 ? ["🥇","🥈","🥉"][rankNum - 1] : (rankNum || "—")}
       </div>
 
       {/* Identity & meta */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
-          {candidate.realName ? (
+          {isRevealed ? (
             <span className="font-semibold text-emerald-600 flex items-center gap-1">
-              <Eye className="w-4 h-4" /> {candidate.realName}
+              <Eye className="w-4 h-4" /> {displayName}
             </span>
           ) : (
-            <span className="font-semibold text-primary">{candidate.maskedId}</span>
+            <span className="font-semibold text-primary flex items-center gap-1">
+              <EyeOff className="w-3.5 h-3.5 opacity-50" /> {displayName}
+            </span>
           )}
           <span className="text-xs text-muted-foreground flex items-center gap-1"><Briefcase className="w-3 h-3" />{candidate.targetRole}</span>
           <span className="text-xs text-muted-foreground">{candidate.experienceYears}y exp</span>
         </div>
         {candidate.realEmail && (
-          <div className="mt-1 text-xs text-muted-foreground flex items-center gap-1">
+          <div className="mt-1 text-xs flex items-center gap-1">
             <span className="bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded-md border border-emerald-100">
               {candidate.realEmail}
             </span>
+          </div>
+        )}
+        {!candidate.realEmail && candidate.maskedId && (
+          <div className="mt-1 text-xs text-muted-foreground flex items-center gap-1">
+            <span className="font-mono bg-secondary px-1.5 py-0.5 rounded">ID: {candidate.maskedId}</span>
+            <span>·</span>
+            <span>{candidate.targetRole}</span>
+            <span>·</span>
+            <span>{candidate.experienceYears}y exp</span>
           </div>
         )}
         <div className="mt-1.5"><SkillPills skills={candidate.skills} /></div>
@@ -133,7 +148,7 @@ function CandidateRow({ candidate, onShortlist, onConnect, compact = false }) {
 
       {/* Score */}
       <div className="w-36 shrink-0 hidden sm:block">
-        <ScoreBar value={candidate.overallScore} />
+        <ScoreBar value={candidate.overallScore ?? 0} />
       </div>
 
       {/* Actions */}
@@ -214,7 +229,10 @@ function ShortlistTab({ items, loading, onShortlist, onConnect }) {
   );
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
+      <p className="text-sm text-muted-foreground">
+        <span className="font-semibold text-foreground">{items.length}</span> candidate{items.length !== 1 ? "s" : ""} saved — sorted by score.
+      </p>
       {items.map(c => <CandidateRow key={c.maskedId} candidate={c} onShortlist={onShortlist} onConnect={onConnect} />)}
     </div>
   );
