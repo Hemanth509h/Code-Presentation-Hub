@@ -19,7 +19,7 @@ export const useAppStore = create(
 
       setUser: (user) => {
         const { userCandidateMap } = get();
-        const restoredCandidateId = user ? (userCandidateMap[user.id] ?? null) : null;
+        const restoredCandidateId = user ? (user.candidateId ?? userCandidateMap[user.id] ?? null) : null;
         set((state) => ({
           user,
           authLoading: false,

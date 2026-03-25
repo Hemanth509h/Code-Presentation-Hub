@@ -65,8 +65,19 @@ export default function Home() {
         },
       },
       {
-        onSuccess: (data) => {
-          if (user?.id) linkUserToCandidate(user.id, data.candidateId);
+        onSuccess: async (data) => {
+          if (user?.id) {
+            linkUserToCandidate(user.id, data.candidateId);
+            try {
+              await fetch("/api/auth/candidate-id", {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ candidateId: data.candidateId })
+              });
+            } catch (err) {
+              console.error("Failed to save candidate ID to profile:", err);
+            }
+          }
           setRegisteredProfile({ id: data.candidateId });
         },
       }

@@ -31,6 +31,7 @@ router.post("/login", async (req, res) => {
     email: user.email,
     role: user.user_metadata?.role || "candidate",
     name: user.user_metadata?.name || "",
+    candidateId: user.user_metadata?.candidate_id || null,
   });
 });
 
@@ -83,6 +84,7 @@ router.get("/me", async (req, res) => {
     email: user.email,
     role: user.user_metadata?.role || "candidate",
     name: user.user_metadata?.name || "",
+    candidateId: user.user_metadata?.candidate_id || null,
   });
 });
 
@@ -104,6 +106,23 @@ router.put("/profile", requireAuth, async (req, res) => {
   res.json({ success: true, name: data.user.user_metadata?.name });
 });
 
+router.put("/candidate-id", requireAuth, async (req, res) => {
+  const { candidateId } = req.body;
+  if (!candidateId) {
+    return res.status(400).json({ error: "missing_fields", message: "Candidate ID is required" });
+  }
+
+  const { data, error } = await supabase.auth.admin.updateUserById(req.user.id, {
+    user_metadata: { ...req.user.user_metadata, candidate_id: candidateId }
+  });
+
+  if (error) {
+    return res.status(400).json({ error: "update_error", message: error.message });
+  }
+
+  res.json({ success: true, candidateId });
+});
+
 export async function requireAuth(req, res, next) {
   const token = req.cookies?.sb_access_token;
   if (!token) {
@@ -119,6 +138,7 @@ export async function requireAuth(req, res, next) {
     email: data.user.email,
     role: data.user.user_metadata?.role || "candidate",
     name: data.user.user_metadata?.name || "",
+    candidateId: data.user.user_metadata?.candidate_id || null,
   };
   next();
 }

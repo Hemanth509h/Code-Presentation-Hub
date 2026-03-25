@@ -111,10 +111,23 @@ function CandidateRow({ candidate, onShortlist, onConnect, compact = false }) {
       {/* Identity & meta */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="font-semibold text-primary">{candidate.maskedId}</span>
+          {candidate.realName ? (
+            <span className="font-semibold text-emerald-600 flex items-center gap-1">
+              <Eye className="w-4 h-4" /> {candidate.realName}
+            </span>
+          ) : (
+            <span className="font-semibold text-primary">{candidate.maskedId}</span>
+          )}
           <span className="text-xs text-muted-foreground flex items-center gap-1"><Briefcase className="w-3 h-3" />{candidate.targetRole}</span>
           <span className="text-xs text-muted-foreground">{candidate.experienceYears}y exp</span>
         </div>
+        {candidate.realEmail && (
+          <div className="mt-1 text-xs text-muted-foreground flex items-center gap-1">
+            <span className="bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded-md border border-emerald-100">
+              {candidate.realEmail}
+            </span>
+          </div>
+        )}
         <div className="mt-1.5"><SkillPills skills={candidate.skills} /></div>
       </div>
 

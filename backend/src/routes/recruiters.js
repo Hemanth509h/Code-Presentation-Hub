@@ -179,8 +179,14 @@ router.get("/blind-pool", requireAuth, async (req, res) => {
       .select("*")
       .eq("recruiter_id", recruiterId);
 
+    const { data: usersData } = await supabase.auth.admin.listUsers();
+    const users = usersData?.users || [];
+
     const pool = (candidates ?? []).map((c, idx) => {
       const conn = (conns || []).find(con => con.candidate_id === c.candidate_id);
+      const isShortlisted = shortlist.includes(c.candidate_id);
+      const user = isShortlisted ? users.find(u => u.user_metadata?.candidate_id === c.candidate_id) : null;
+
       return {
         rank: idx + 1,
         maskedId: c.candidate_id,
@@ -188,9 +194,11 @@ router.get("/blind-pool", requireAuth, async (req, res) => {
         skills: c.skills,
         experienceYears: c.experience_years,
         overallScore: c.overall_score ?? 0,
-        isShortlisted: shortlist.includes(c.candidate_id),
+        isShortlisted,
         connectionStatus: conn?.status ?? null,
         connectionId: conn?.id ?? null,
+        realName: user ? user.user_metadata?.name || null : null,
+        realEmail: user ? user.email || null : null,
       };
     });
 
@@ -239,9 +247,13 @@ router.get("/shortlist", requireAuth, async (req, res) => {
       .select("*")
       .eq("recruiter_id", recruiterId);
 
+    const { data: usersData } = await supabase.auth.admin.listUsers();
+    const users = usersData?.users || [];
+
     const items = shortlistedIds.map(realId => {
       const c = (allCandidates ?? []).find(x => x.candidate_id === realId);
       const conn = (conns || []).find(con => con.candidate_id === realId);
+      const user = users.find(u => u.user_metadata?.candidate_id === realId);
       return {
         maskedId: realId,
         targetRole: c?.target_role ?? "Unknown",
@@ -250,6 +262,8 @@ router.get("/shortlist", requireAuth, async (req, res) => {
         overallScore: c?.overall_score ?? 0,
         connectionStatus: conn?.status ?? null,
         connectionId: conn?.id ?? null,
+        realName: user ? user.user_metadata?.name || "Anonymous" : null,
+        realEmail: user ? user.email || null : null,
       };
     });
     res.json(items);
